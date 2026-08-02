@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BOOMBOX - POS & Inventario ERP</title>
+    
+    <link rel="icon" type="image/png" href="ICONO SF.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <link rel="stylesheet" href="/src/style.css">
+</head>
+<body class="bg-slate-50 text-gray-800 font-sans pb-10">
+
+    <div id="toast-container"></div>
+    <div id="zona-impresion" class="hidden"></div>
+
+    <!-- MODAL DE EDICIÓN DE PRODUCTO -->
+    <div id="modalEdicion" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg p-6 my-auto">
+            <h2 class="text-xl font-bold mb-4 text-orange-600 border-b pb-2">✏️ Editar Inventario</h2>
+            <div class="space-y-3">
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-xs font-bold text-gray-600 uppercase">SKU</label><input type="text" id="edit_sku" class="w-full p-2 border rounded bg-gray-100 cursor-not-allowed" disabled></div>
+                    <div class="flex flex-col justify-end">
+                        <label class="flex items-center cursor-pointer mb-2">
+                            <div class="relative">
+                                <input type="checkbox" id="edit_granel" class="hidden toggle-checkbox">
+                                <div class="toggle-label block bg-gray-300 w-10 h-6 rounded-full transition-colors duration-300"></div>
+                                <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 transform peer-checked:translate-x-full"></div>
+                            </div>
+                            <span class="ml-3 text-xs font-bold text-gray-700 uppercase">Vender a granel</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div><label class="text-xs font-bold text-gray-600 uppercase">Nombre</label><input type="text" id="edit_nom" class="w-full p-2 border rounded"></div>
+                    <div>
+                        <label class="text-xs font-bold text-gray-600 uppercase">Categoría</label>
+                        <input type="text" id="edit_cat" list="cat-list" class="w-full p-2 border rounded mb-2">
+                        <label class="text-xs font-bold text-teal-600 uppercase">Proveedor</label>
+                        <select id="edit_prov" class="w-full p-2 border rounded bg-teal-50">
+                            <option value="">Seleccionar Proveedor...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4 bg-orange-50 p-2 rounded border mt-2">
+                    <div><label class="text-xs font-bold text-gray-600 uppercase">Precio Normal ($)</label><input type="number" step="any" id="edit_pre" class="w-full p-2 border rounded font-bold"></div>
+                    <div><label class="text-xs font-bold text-red-600 uppercase">Precio Promo ($)</label><input type="number" step="any" id="edit_promo" placeholder="0 = Sin Promo" class="w-full p-2 border rounded border-red-300 text-red-600 font-bold"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 bg-green-50 p-2 rounded border">
+                    <div><label class="text-xs font-bold text-green-700 uppercase">Precio Mayoreo ($)</label><input type="number" step="any" id="edit_mayoreo" placeholder="0 = Inactivo" class="w-full p-2 border rounded border-green-300 text-green-700 font-bold"></div>
+                    <div><label class="text-xs font-bold text-green-700 uppercase">Cant. Mínima Mayoreo</label><input type="number" step="any" id="edit_cant_mayoreo" placeholder="Ej. 3" class="w-full p-2 border rounded border-green-300"></div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 border-t pt-2 mt-2">
+                    <div><label class="text-xs font-bold text-gray-600 uppercase">Costo ($)</label><input type="number" step="any" id="edit_cos" class="w-full p-2 border rounded"></div>
+                    <div><label class="text-xs font-bold text-gray-600 uppercase">Stock Actual</label><input type="number" step="any" id="edit_stk" class="w-full p-2 border rounded"></div>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2 mt-2">
+                    <div><label class="text-xs font-bold text-blue-600 uppercase">Stock Mínimo</label><input type="number" step="any" id="edit_min" placeholder="Ej. 5" class="w-full p-2 border rounded bg-blue-50"></div>
+                    <div><label class="text-xs font-bold text-purple-600 uppercase">Stock Máximo</label><input type="number" step="any" id="edit_max" placeholder="Ej. 50" class="w-full p-2 border rounded bg-purple-50"></div>
+                    <div><label class="text-xs font-bold text-red-600 uppercase">Caducidad</label><input type="date" id="edit_caducidad" class="w-full p-2 border rounded border-red-300 text-sm"></div>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" onclick="cerrarModalEdicion()" class="px-4 py-2 bg-gray-200 rounded font-bold">Cancelar</button>
+                <button type="button" onclick="guardarEdicionProducto()" class="px-4 py-2 bg-orange-500 text-white rounded font-bold">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- NUEVO: MODAL ORDEN DE COMPRA -->
+    <div id="modalOrdenCompra" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4 overflow-y-auto">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-4xl p-6 my-auto">
+            <h2 class="text-xl font-bold mb-4 text-blue-600 border-b pb-2">📋 Editar y Generar Orden de Compra</h2>
+            <p class="text-sm text-gray-500 mb-4">Modifica las cantidades a pedir si lo consideras necesario. El costo total se actualizará automáticamente basado en el costo individual de cada producto.</p>
+            <div class="overflow-x-auto max-h-96 border rounded-lg">
+                <table class="w-full text-left border-collapse text-sm min-w-[700px]">
+                    <thead class="bg-blue-50 text-blue-800 sticky top-0 shadow">
+                        <tr>
+                            <th class="p-3 border-b">SKU</th>
+                            <th class="p-3 border-b">Producto</th>
+                            <th class="p-3 border-b">Proveedor</th>
+                            <th class="p-3 border-b text-center">Stock Actual</th>
+                            <th class="p-3 border-b text-right">Costo Unit.</th>
+                            <th class="p-3 border-b text-center bg-blue-100">Cant. a Pedir</th>
+                            <th class="p-3 border-b text-right">Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tablaOrdenCompraBody">
+                        <!-- Llenado por JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="mt-4 flex justify-between items-center bg-gray-50 p-4 rounded border-2 border-dashed border-gray-300">
+                <span class="text-lg font-bold text-gray-600">COSTO ESTIMADO DE LA ORDEN:</span>
+                <span class="text-3xl font-black text-orange-600" id="totalOrdenCompra">$0.00</span>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <button type="button" onclick="cerrarModalOrden()" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded font-bold transition">Cancelar</button>
+                <button type="button" onclick="imprimirOrdenCompra()" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition shadow-lg flex items-center gap-2">🖨️ Guardar e Imprimir Orden</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DATALIST PARA CATEGORÍAS -->
+    <datalist id="cat-list">
+        <option value="Abarrotes"><option value="Perecederos"><option value="Farmacia"><option value="Ferretería"><option value="Electrónica"><option value="Lácteos y Carnes"><option value="Bebidas">
+    </datalist>
+
+    <!-- PANTALLA DE AUTENTICACIÓN -->
+    <div id="authScreen" class="min-h-screen flex items-center justify-center bg-gray-900 px-4">
+        <div class="bg-white p-8 rounded-xl shadow-2xl w-full max-w-md text-center">
+            <div class="flex justify-center mb-8"><img src="BOOMBOX 2.png" alt="BOOMBOX Logo" class="w-80 md:w-96 h-auto object-contain"></div>
+            <div id="loginForm">
+                <h2 class="text-lg font-bold text-gray-700 mb-4">Iniciar Sesión</h2>
+                <input type="text" id="loginUser" placeholder="Usuario (Ej. raulD2H)" class="w-full mb-3 p-3 border rounded-lg focus:ring-2 focus:ring-orange-500 font-bold text-lg">
+                <input type="password" id="loginPass" placeholder="Contraseña" class="w-full mb-4 p-3 border rounded-lg focus:ring-2 focus:ring-orange-500">
+                <button type="button" id="btnLogin" onclick="iniciarSesion()" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-lg transition mb-4">Entrar</button>
+                <button type="button" onclick="recuperarPassword()" class="text-sm text-blue-600 hover:underline">¿Olvidaste tu contraseña?</button>
+                <p class="mt-4 text-sm text-gray-500 border-t pt-4">¿Nuevo negocio? <span onclick="toggleAuth()" class="text-orange-500 cursor-pointer font-bold">Regístrate aquí</span></p>
+            </div>
+            <div id="registerForm" class="hidden text-left">
+                <h2 class="text-lg font-bold text-gray-700 mb-4 text-center">Registrar Negocio</h2>
+                <label class="text-xs font-bold text-gray-500 uppercase">Datos del Negocio</label>
+                <input type="text" id="regEmpresa" placeholder="Nombre (Ej. DISTRIBUIDORES2HERMANOS)" class="w-full mb-2 p-3 border rounded-lg text-sm bg-gray-50">
+                <input type="text" id="regZona" placeholder="Zona Principal (Ej. Toluca)" class="w-full mb-4 p-3 border rounded-lg text-sm bg-gray-50">
+                <label class="text-xs font-bold text-gray-500 uppercase">Datos del Administrador</label>
+                <input type="text" id="regUser" placeholder="Crea un Usuario (Ej. dueño123)" class="w-full mb-2 p-3 border rounded-lg text-sm bg-gray-50">
+                <input type="email" id="regEmail" placeholder="Correo (Solo para recuperar contraseña)" class="w-full mb-2 p-3 border rounded-lg text-sm bg-gray-50">
+                <input type="password" id="regPass" placeholder="Contraseña (mínimo 6 caracteres)" class="w-full mb-6 p-3 border rounded-lg text-sm bg-gray-50">
+                <button type="button" id="btnRegister" onclick="registrarNegocio()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition">Crear Cuenta Principal</button>
+                <p class="mt-4 text-sm text-center text-gray-500">¿Ya tienes cuenta? <span onclick="toggleAuth()" class="text-blue-600 cursor-pointer font-bold">Inicia sesión</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA PRINCIPAL DE LA APP -->
+    <div id="appScreen" class="hidden min-h-screen">
+        <nav class="bg-white shadow-md p-4 flex justify-between items-center relative z-10">
+            <div class="flex items-center"><img src="BOOMBOX 2.png" alt="BOOMBOX" class="h-8"></div>
+            <div class="flex items-center gap-4">
+                <div class="text-right hidden md:block">
+                    <p class="font-bold text-gray-800" id="displayEmpresa">Negocio</p>
+                    <p class="text-xs text-gray-500" id="displayUser">Usuario (Rol)</p>
+                </div>
+                <button type="button" onclick="cerrarSesion()" class="text-red-500 font-bold text-sm hover:underline">Cerrar Sesión</button>
+            </div>
+        </nav>
+
+        <div class="bg-white border-b flex justify-start md:justify-center gap-2 md:gap-4 text-sm font-semibold text-gray-600 overflow-x-auto whitespace-nowrap px-4 hide-scrollbar">
+            <button type="button" onclick="cambiarPestaña('tab-ventas')" id="btn-tab-ventas" class="py-4 px-2 hover:text-orange-500 tab-active">🛒 Ventas</button>
+            <button type="button" onclick="cambiarPestaña('tab-general')" id="btn-tab-general" class="py-4 px-2 hover:text-orange-500">📦 Inventario</button>
+            <button type="button" onclick="cambiarPestaña('tab-reportes')" id="btn-tab-reportes" class="py-4 px-2 hover:text-orange-500 hidden">📈 Reportes</button>
+            <button type="button" onclick="cambiarPestaña('tab-agotados')" id="btn-tab-agotados" class="py-4 px-2 hover:text-orange-500 hidden">⚠️ Alertas Stock</button>
+            <button type="button" onclick="cambiarPestaña('tab-proveedores')" id="btn-tab-proveedores" class="py-4 px-2 hover:text-orange-500 hidden">🚚 Proveedores</button>
+            <button type="button" onclick="cambiarPestaña('tab-kardex')" id="btn-tab-kardex" class="py-4 px-2 hover:text-orange-500 hidden">📋 Kardex</button>
+            <button type="button" onclick="cambiarPestaña('tab-registro')" id="btn-tab-registro" class="py-4 px-2 hover:text-orange-500 hidden">📥 Bodega</button>
+            <button type="button" onclick="cambiarPestaña('tab-usuarios')" id="btn-tab-usuarios" class="py-4 px-2 hover:text-orange-500 hidden">👥 Usuarios</button>
+        </div>
+
+        <div class="max-w-7xl mx-auto p-4 md:p-6 mt-4">
+
+            <div class="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-wrap items-center gap-4 border-l-4 border-orange-500 justify-between">
+                <div class="flex items-center gap-4 w-full md:w-auto">
+                    <label class="font-bold text-gray-700">Zona actual:</label>
+                    <select id="zonaSelect" onchange="alCambiarZona()" class="p-2 border rounded bg-gray-50 focus:ring-2 focus:ring-orange-500"></select>
+                    <button type="button" id="btnAgregarZona" onclick="agregarNuevaZona()" class="text-sm bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded hidden">+ Nueva Zona</button>
+                </div>
+                <button type="button" id="btnVaciarInventario" onclick="vaciarInventario()" class="hidden bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded text-sm shadow">⚠️ Vaciar Inventario</button>
+            </div>
+
+            <!-- PESTAÑA: VENTAS -->
+            <div id="tab-ventas" class="tab-content block">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md h-fit">
+                        <h2 class="text-xl font-bold mb-4 flex items-center gap-2">🛒 Agregar Producto</h2>
+                        
+                        <div class="relative w-full mb-4">
+                            <input type="text" id="venta_busqueda" onkeyup="filtrarProductosVenta()" placeholder="Busca SKU o Nombre..." class="p-4 border-2 rounded-lg w-full focus:ring-2 focus:ring-orange-500 text-lg shadow-inner" autocomplete="off">
+                            <div id="sugerencias_venta" class="absolute z-50 w-full bg-white border rounded-b-lg shadow-xl hidden max-h-48 overflow-y-auto"></div>
+                        </div>
+
+                        <div class="text-center my-4 font-bold text-gray-300 relative">
+                            <hr class="absolute top-1/2 w-full border-gray-200">
+                            <span class="bg-white px-4 relative text-sm">O ESCANEA</span>
+                        </div>
+
+                        <div class="mb-4">
+                            <button type="button" id="btn-iniciar-camara-ventas" onclick="iniciarCamara('ventas')" class="w-full bg-gray-900 text-white font-bold py-4 rounded-lg hover:bg-black transition shadow-lg flex justify-center items-center gap-2">
+                                <span class="text-xl">📷</span> Encender Escáner
+                            </button>
+                            <button type="button" id="btn-detener-camara-ventas" onclick="detenerCamara('ventas')" class="hidden w-full bg-red-600 text-white font-bold py-4 rounded-lg hover:bg-red-700 transition shadow-lg flex justify-center items-center gap-2">
+                                ❌ Apagar Escáner
+                            </button>
+                        </div>
+                        <div id="reader-ventas" class="hidden reader-container border-2 border-dashed border-gray-400 bg-gray-50 shadow-inner"></div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-lg shadow-md flex flex-col">
+                        <h2 class="text-xl font-bold mb-4 text-orange-600">🛍️ Lista de Compra</h2>
+                        <div class="overflow-y-auto max-h-80 mb-4 border-b pb-4">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="text-gray-500 text-xs uppercase border-b-2"><th class="pb-2">Producto</th><th class="pb-2 text-center">Cant. / Peso</th><th class="pb-2 text-right">Subtotal</th><th></th></tr>
+                                </thead>
+                                <tbody id="tabla-carrito"><tr><td colspan="4" class="text-center text-gray-400 py-8">El carrito está vacío</td></tr></tbody>
+                            </table>
+                        </div>
+                        <div class="mt-auto bg-gray-50 p-4 rounded-lg border">
+                            <div class="flex justify-between items-center mb-4">
+                                <span class="text-lg font-bold text-gray-600">TOTAL:</span>
+                                <span class="text-4xl font-black text-green-600" id="gran-total">$0.00</span>
+                            </div>
+                            
+                            <label class="flex items-center space-x-2 mb-4 p-2 bg-gray-50 rounded border cursor-pointer hover:bg-gray-100 transition">
+                                <input type="checkbox" id="chk_imprimir" class="w-5 h-5 text-orange-600 rounded" checked>
+                                <span class="font-bold text-gray-700">Imprimir ticket al cobrar</span>
+                            </label>
+
+                            <button type="button" id="btn-cobrar" onclick="procesarVentaCompleta()" class="bg-orange-500 text-white text-xl font-bold py-4 rounded-lg shadow-lg hover:bg-orange-600 w-full transition">✅ Cobrar e Imprimir</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PESTAÑA: INVENTARIO GENERAL -->
+            <div id="tab-general" class="tab-content hidden">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                        <h2 class="text-xl font-bold flex items-center gap-2">📊 Inventario General</h2>
+                        <div class="flex flex-wrap gap-2">
+                            <input type="text" id="filtro_inv_txt" onkeyup="renderInventarioPantalla()" placeholder="Buscar..." class="p-2 border rounded text-sm w-40">
+                            <select id="filtro_inv_cat" onchange="renderInventarioPantalla()" class="p-2 border rounded text-sm bg-gray-50">
+                                <option value="Todas">Todas las categorías</option>
+                            </select>
+                            <select id="filtro_inv_ord" onchange="renderInventarioPantalla()" class="p-2 border rounded text-sm bg-gray-50">
+                                <option value="nombre">Orden: A-Z</option>
+                                <option value="stock_asc">Menor Stock</option>
+                                <option value="stock_desc">Mayor Stock</option>
+                            </select>
+                            <button type="button" onclick="cargarInventarioGeneral()" class="text-sm text-blue-600 bg-blue-50 px-3 py-2 rounded hover:bg-blue-100 transition">↻ Actualizar BD</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[800px]">
+                            <thead>
+                                <tr class="bg-gray-100 text-gray-700 text-sm">
+                                    <th class="p-3 border-b">SKU</th>
+                                    <th class="p-3 border-b">Producto</th>
+                                    <th class="p-3 border-b">Atributos</th>
+                                    <th class="p-3 border-b text-center">Stock</th>
+                                    <th class="p-3 border-b text-left costo-col">Costo</th>
+                                    <th class="p-3 border-b text-left">Precio</th>
+                                    <th class="p-3 border-b text-center accion-col">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaInventarioGeneralBody"><tr><td colspan="7" class="p-8 text-center text-gray-500">Cargando datos...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PESTAÑA: REPORTES -->
+            <div id="tab-reportes" class="tab-content hidden">
+                <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-indigo-600">
+                    <h2 class="text-xl font-bold mb-6">📈 Dashboard de Ventas</h2>
+                    <div class="flex flex-wrap gap-4 items-end mb-6 bg-gray-50 p-4 rounded-lg border">
+                        <div class="w-full md:w-auto"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha Inicio</label><input type="date" id="rep_inicio" class="w-full p-2 border rounded"></div>
+                        <div class="w-full md:w-auto"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Fecha Fin</label><input type="date" id="rep_fin" class="w-full p-2 border rounded"></div>
+                        <div class="w-full md:w-auto"><label class="block text-xs font-bold text-gray-500 uppercase mb-1">Filtro Categoría</label><select id="rep_cat" class="w-full p-2 border rounded"><option value="Todas">Todas</option></select></div>
+                        <button onclick="generarReporte()" class="w-full md:w-auto bg-indigo-600 text-white font-bold py-2 px-6 rounded hover:bg-indigo-700 transition">Generar Reporte</button>
+                        <button onclick="descargarCSV()" class="w-full md:w-auto bg-green-600 text-white font-bold py-2 px-6 rounded hover:bg-green-700 transition md:ml-auto">📥 Exportar a Excel</button>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div class="bg-white border p-6 rounded-xl shadow-sm border-l-4 border-l-green-500"><p class="text-sm font-bold text-gray-500 uppercase">Total Ingresos ($)</p><p class="text-4xl font-black text-green-600 mt-2" id="rep_total_vendido">$0.00</p></div>
+                        <div class="bg-white border p-6 rounded-xl shadow-sm border-l-4 border-l-blue-500"><p class="text-sm font-bold text-gray-500 uppercase">Piezas Vendidas</p><p class="text-4xl font-black text-blue-600 mt-2" id="rep_piezas_vendidas">0</p></div>
+                        <div class="bg-white border p-6 rounded-xl shadow-sm border-l-4 border-l-orange-500"><p class="text-sm font-bold text-gray-500 uppercase">Ticket Promedio</p><p class="text-4xl font-black text-orange-600 mt-2" id="rep_ticket_promedio">$0.00</p></div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <h3 class="font-bold text-gray-700 mb-3 border-b pb-2">Detalle de Ventas</h3>
+                        <table class="w-full text-left border-collapse text-sm min-w-[600px]">
+                            <thead><tr class="bg-gray-100 text-gray-700"><th class="p-3 border-b">Fecha</th><th class="p-3 border-b">Producto</th><th class="p-3 border-b">Categoría</th><th class="p-3 border-b text-center">Cant.</th><th class="p-3 border-b">Vendedor</th><th class="p-3 border-b text-right">Total</th></tr></thead>
+                            <tbody id="tablaReportesBody"><tr><td colspan="6" class="p-8 text-center text-gray-500">Selecciona fechas y genera el reporte</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PESTAÑA: AGOTADOS Y MÍNIMOS -->
+            <div id="tab-agotados" class="tab-content hidden">
+                <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-red-600">
+                    <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                        <h2 class="text-xl font-bold flex items-center gap-2">⚠️ Centro de Alertas y Resurtido</h2>
+                        <div class="flex flex-wrap gap-2">
+                            <select id="alerta_filtro_tipo" onchange="renderAgotados()" class="p-2 border rounded text-sm bg-red-50 text-red-700 font-bold">
+                                <option value="todas">Todas las Alertas</option>
+                                <option value="stock">Solo Stock Bajo/Agotado</option>
+                                <option value="caducidad">Solo Próximos a Caducar</option>
+                            </select>
+                            <select id="alerta_filtro_cat" onchange="renderAgotados()" class="p-2 border rounded text-sm bg-gray-50">
+                                <option value="Todas">Todas las Categorías</option>
+                            </select>
+                            <button type="button" onclick="cargarInventarioGeneral()" class="text-sm bg-gray-200 px-3 py-2 rounded hover:bg-gray-300">↻ Recargar</button>
+                            <button onclick="window.generarOrdenCompra()" class="text-sm bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded shadow flex items-center gap-2 transition">
+                                📋 Generar Orden de Compra
+                            </button>
+                        </div>
+                    </div>
+                    <p class="text-sm text-gray-500 mb-4 border-l-4 border-gray-300 pl-3">Ordenado automáticamente para priorizar el resurtido de los productos que te generan <span class="font-bold text-green-600">Mayor Ganancia</span>.</p>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse min-w-[800px]">
+                            <thead>
+                                <tr class="bg-red-50 text-red-800 border-b-2 border-red-200">
+                                    <th class="p-3">SKU / Producto</th>
+                                    <th class="p-3 text-center">Stock / Límite</th>
+                                    <th class="p-3">Estado de Alerta</th>
+                                    <th class="p-3 text-right">Ganancia Unitaria</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaAgotadosBody"><tr><td colspan="4" class="p-8 text-center text-gray-500">Cargando datos...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PESTAÑA: PROVEEDORES -->
+            <div id="tab-proveedores" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-teal-500 h-fit lg:col-span-1">
+                        <h2 class="text-xl font-bold mb-4">🚚 Agregar Proveedor</h2>
+                        <div class="space-y-3">
+                            <input type="text" id="prov_nombre" placeholder="Nombre de Empresa / Agente" class="w-full p-3 border rounded focus:ring-2 focus:ring-teal-500">
+                            <input type="text" id="prov_tel" placeholder="Teléfono / Contacto" class="w-full p-3 border rounded focus:ring-2 focus:ring-teal-500">
+                            <div>
+                                <label class="text-xs font-bold text-gray-500 uppercase">Días de Visita</label>
+                                <div class="flex gap-2 mt-1 flex-wrap">
+                                    <label class="flex items-center gap-1 text-sm bg-gray-100 p-1 rounded"><input type="checkbox" value="L" class="prov_dia"> L</label>
+                                    <label class="flex items-center gap-1 text-sm bg-gray-100 p-1 rounded"><input type="checkbox" value="M" class="prov_dia"> M</label>
+                                    <label class="flex items-center gap-1 text-sm bg-gray-100 p-1 rounded"><input type="checkbox" value="Mi" class="prov_dia"> Mi</label>
+                                    <label class="flex items-center gap-1 text-sm bg-gray-100 p-1 rounded"><input type="checkbox" value="J" class="prov_dia"> J</label>
+                                    <label class="flex items-center gap-1 text-sm bg-gray-100 p-1 rounded"><input type="checkbox" value="V" class="prov_dia"> V</label>
+                                    <label class="flex items-center gap-1 text-sm bg-gray-100 p-1 rounded"><input type="checkbox" value="S" class="prov_dia"> S</label>
+                                </div>
+                            </div>
+                            <textarea id="prov_notas" placeholder="Productos que surte, enlace a lista de precios o notas..." class="w-full p-3 border rounded focus:ring-2 focus:ring-teal-500 h-24"></textarea>
+                            <button type="button" onclick="guardarProveedor()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 rounded-lg transition shadow">Guardar Proveedor</button>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md lg:col-span-2 overflow-x-auto">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-bold">Directorio de Proveedores</h2>
+                            <button type="button" onclick="cargarProveedores()" class="text-sm bg-teal-50 text-teal-600 px-3 py-1 rounded">↻ Refrescar</button>
+                        </div>
+                        <table class="w-full text-left border-collapse min-w-[500px]">
+                            <thead>
+                                <tr class="bg-gray-100 text-gray-700 text-sm">
+                                    <th class="p-3 border-b">Proveedor</th>
+                                    <th class="p-3 border-b">Días Visita</th>
+                                    <th class="p-3 border-b">Notas / Productos</th>
+                                    <th class="p-3 border-b">Acción</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaProveedoresBody"><tr><td colspan="4" class="p-8 text-center text-gray-500">Cargando directorio...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PESTAÑA: KARDEX -->
+            <div id="tab-kardex" class="tab-content hidden">
+                <div class="bg-white p-6 rounded-lg shadow-md overflow-x-auto border-t-4 border-indigo-500">
+                    <h2 class="text-xl font-bold mb-4">📋 Kardex (Historial de Movimientos)</h2>
+                    <div class="flex flex-wrap gap-2 mb-4 border-b border-gray-200 pb-2">
+                        <button onclick="cargarKardex('entradas')" id="btn-kardex-entradas" class="px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition">Entradas & Ajustes</button>
+                        <button onclick="cargarKardex('salidas')" id="btn-kardex-salidas" class="px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition">Salidas (Ventas)</button>
+                        <button onclick="cargarKardex(window.kardexActual)" class="ml-auto text-sm bg-gray-100 text-gray-600 px-3 py-2 rounded">↻ Refrescar Tabla</button>
+                    </div>
+                    <table class="w-full text-left border-collapse text-sm min-w-[600px]">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-600 uppercase text-xs"><th class="p-3 border-b">Fecha y Hora</th><th class="p-3 border-b">Tipo</th><th class="p-3 border-b">SKU</th><th class="p-3 border-b">Producto</th><th class="p-3 border-b text-center">Cant.</th><th class="p-3 border-b">Usuario</th></tr>
+                        </thead>
+                        <tbody id="tablaKardexBody"><tr><td colspan="6" class="p-8 text-center text-gray-500">Cargando...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PESTAÑA: BODEGA -->
+            <div id="tab-registro" class="tab-content hidden">
+                <div class="bg-white p-6 rounded-lg shadow-md mb-6 border-t-4 border-green-500">
+                    <h2 class="text-xl font-bold mb-4">📦 Ingreso Manual a Bodega</h2>
+                    <div class="mb-6 flex gap-2">
+                        <button type="button" id="btn-iniciar-camara-ingreso" onclick="iniciarCamara('ingreso')" class="bg-gray-800 text-white font-bold py-2 px-6 rounded-lg hover:bg-black transition shadow">📷 Escanear SKU</button>
+                        <button type="button" id="btn-detener-camara-ingreso" onclick="detenerCamara('ingreso')" class="hidden bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition shadow">❌ Cancelar</button>
+                    </div>
+                    <div id="reader-ingreso" class="hidden reader-container border-2 border-dashed border-gray-300 bg-gray-50 mb-6"></div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
+                        <input type="text" id="p_sku" placeholder="SKU" class="p-3 border-2 rounded focus:ring-2 focus:ring-green-500 bg-green-50 font-mono">
+                        <input type="text" id="p_nom" placeholder="Nombre" class="p-3 border-2 rounded focus:ring-2 focus:ring-green-500 lg:col-span-2">
+                        <div>
+                            <input type="text" id="p_cat" list="cat-list" placeholder="Categoría" class="w-full p-3 border-2 rounded focus:ring-2 focus:ring-green-500 mb-2">
+                            <select id="p_prov" class="w-full p-3 border-2 rounded bg-teal-50 focus:ring-2 focus:ring-teal-500 transition-colors">
+                                <option value="">Seleccionar Proveedor...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex items-center">
+                            <label class="flex items-center cursor-pointer">
+                                <div class="relative">
+                                    <input type="checkbox" id="p_granel" class="hidden toggle-checkbox">
+                                    <div class="toggle-label block bg-gray-300 w-10 h-6 rounded-full transition-colors duration-300"></div>
+                                    <div class="dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 transform peer-checked:translate-x-full"></div>
+                                </div>
+                                <span class="ml-2 text-xs font-bold text-gray-700 uppercase">Granel (Decimales)</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 border-t pt-4">
+                        <input type="number" step="any" id="p_cos" placeholder="Costo ($)" class="p-3 border-2 rounded focus:ring-2 focus:ring-gray-400">
+                        <input type="number" step="any" id="p_pre" placeholder="Precio ($)" class="p-3 border-2 rounded focus:ring-2 focus:ring-green-500 border-green-300">
+                        <input type="number" step="any" id="p_mayoreo" placeholder="Precio Mayoreo ($)" class="p-3 border-2 rounded focus:ring-2 focus:ring-green-500 border-green-300 bg-green-50">
+                        <input type="number" step="any" id="p_cant_mayoreo" placeholder="Cant. Min. Mayoreo" class="p-3 border-2 rounded focus:ring-2 focus:ring-green-500 border-green-300 bg-green-50">
+                        <input type="number" step="any" id="p_stk" placeholder="Stock / Peso a ingresar" class="p-3 border-2 rounded focus:ring-2 focus:ring-blue-500 font-bold col-span-2 md:col-span-1">
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                        <input type="number" step="any" id="p_min" placeholder="Alerta Stock Mínimo" class="p-3 border-2 rounded focus:ring-2 focus:ring-blue-500 bg-blue-50">
+                        <input type="number" step="any" id="p_max" placeholder="Límite Stock Máximo" class="p-3 border-2 rounded focus:ring-2 focus:ring-purple-500 bg-purple-50">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-500 mb-1">Fecha Caducidad (Opcional)</label>
+                            <input type="date" id="p_caducidad" class="w-full p-3 border-2 rounded focus:ring-2 focus:ring-red-500 text-sm">
+                        </div>
+                    </div>
+
+                    <button type="button" onclick="guardarProducto()" class="mt-6 w-full lg:w-auto bg-green-600 text-white text-lg font-bold py-3 px-10 rounded-lg shadow-lg hover:bg-green-700 transition">Guardar Producto</button>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-amber-500">
+                    <h2 class="text-xl font-bold mb-4">📄 Carga Masiva Rápida (XML / TXT)</h2>
+                    <div class="border-2 border-dashed border-gray-400 rounded-xl p-10 text-center bg-gray-50 hover:bg-gray-100 transition relative">
+                        <input type="file" id="archivoInventario" accept=".txt,.xml" onchange="procesarArchivoMasivo()" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
+                        <div class="pointer-events-none"><span class="text-5xl mb-3">📁</span><p class="text-lg font-bold text-gray-700">Toca aquí o arrastra tu archivo</p></div>
+                    </div>
+                    <div id="statusCargaMasiva" class="hidden mt-4 p-4 text-center rounded-lg font-bold"></div>
+                </div>
+            </div>
+
+            <!-- PESTAÑA: USUARIOS -->
+            <div id="tab-usuarios" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-blue-500 h-fit">
+                        <h2 class="text-xl font-bold mb-4">👥 Registrar Nuevo Colaborador</h2>
+                        <div class="space-y-4">
+                            <input type="text" id="new_user" placeholder="Usuario (Ej. vendedor_centro)" class="w-full p-3 border rounded bg-blue-50">
+                            <input type="email" id="new_email" placeholder="Correo electrónico" class="w-full p-3 border rounded">
+                            <input type="password" id="new_pass" placeholder="Contraseña temporal" class="w-full p-3 border rounded">
+                            <select id="new_role" class="w-full p-3 border rounded font-bold text-gray-700"><option value="Vendedor">🟢 Vendedor</option><option value="Gerente">🟠 Gerente</option></select>
+                            <button type="button" onclick="crearUsuarioSecundario()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-lg hover:bg-blue-700 transition">Crear Acceso</button>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow-md overflow-x-auto">
+                        <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold">📋 Equipo de Trabajo</h2><button type="button" onclick="cargarUsuarios()" class="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded">↻ Refrescar</button></div>
+                        <table class="w-full text-left text-sm border-collapse">
+                            <thead><tr class="bg-gray-100 text-gray-700 uppercase text-xs"><th class="p-3 border-b">Usuario</th><th class="p-3 border-b">Rol</th><th class="p-3 border-b">Zonas</th></tr></thead>
+                            <tbody id="tablaUsuariosBody"><tr><td colspan="3" class="text-center p-8 text-gray-500">Cargando equipo...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cerebro de Vite -->
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
