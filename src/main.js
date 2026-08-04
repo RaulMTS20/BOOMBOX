@@ -107,6 +107,7 @@ window.registrarNegocio = async () => {
         btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; 
     }
 };
+
 window.iniciarSesion = async () => { 
     const btn = document.getElementById('btnLogin'); 
     const u = document.getElementById('loginUser').value.trim(); 
@@ -141,6 +142,7 @@ window.iniciarSesion = async () => {
         btn.innerText = "Entrar"; btn.disabled = false; 
     }
 };
+
 window.recuperarPassword = async () => { 
     const u = prompt("Ingresa tu Usuario:"); if(!u) return; 
     try { 
@@ -193,7 +195,7 @@ function iniciarApp() {
     } catch (err) { window.cerrarSesion(); }
 }
 
-// 5. CÁMARA (ACTUALIZADA CON REGISTRO RÁPIDO)
+// 5. CÁMARA E INTEGRACIÓN DE REGISTRO RÁPIDO
 let scanners = { ventas: null, ingreso: null };
 window.iniciarCamara = (m) => { 
     document.getElementById(`reader-${m}`).classList.remove('hidden'); 
@@ -287,8 +289,6 @@ window.renderInventarioPantalla = () => {
         const isManager = (r === 'Dueño' || r === 'Gerente');
         
         const cc = isManager ? `<td class="p-3 text-left costo-col">$${p.costo || 0}</td>` : `<td class="p-3 text-left costo-col hidden"></td>`;
-        
-        // BOTONES CON PURO ICONO
         const ca = isManager ? `<td class="p-3 text-center accion-col md:min-w-[200px]">
             <button onclick="abrirModalEdicion('${p.sku}')" class="text-blue-600 bg-blue-50 px-3 py-2 rounded font-bold hover:bg-blue-100 transition mb-1 md:mb-0 md:mr-2 text-lg" title="Editar">✏️</button>
             <button onclick="eliminarProducto('${p.sku}')" class="text-red-600 bg-red-50 px-3 py-2 rounded font-bold hover:bg-red-100 transition text-lg" title="Borrar">🗑️</button>
@@ -308,13 +308,11 @@ window.renderInventarioPantalla = () => {
         if (p.precio_promo && p.precio_promo > 0) precioStr = `<span class="text-xs text-red-500 line-through block">$${p.precio}</span><span class="text-green-600 font-bold block">$${p.precio_promo} <span class="text-[10px] text-red-500 font-normal">(Promo)</span></span>`;
         if (p.cant_mayoreo > 0 && p.precio_mayoreo > 0) precioStr += `<span class="text-xs text-blue-600 font-bold block mt-1">$${p.precio_mayoreo} <span class="text-gray-500 font-normal">(x${p.cant_mayoreo}+)</span></span>`;
         
-        // LA CELDA DEL SKU AHORA TIENE LA CLASE "hidden"
         h += `<tr class="border-b hover:bg-gray-50"><td class="p-3 font-mono text-gray-500 text-xs hidden">${p.sku}</td><td class="p-3 font-bold">${p.nombre}</td><td class="p-3">${badges}</td><td class="p-3 text-center font-black ${p.stock<=(p.min_stk||0)?'text-red-500':''}">${stockVal}</td>${cc}<td class="p-3 text-left">${precioStr}</td>${ca}</tr>`; 
     }); 
     tb.innerHTML = h || "<tr><td colspan='7' class='text-center p-8 text-gray-500'>No hay productos que coincidan con el filtro</td></tr>";
 };
 
-// FUNCIÓN PARA ELIMINAR 1 SOLO PRODUCTO
 window.eliminarProducto = async (sku) => {
     if(!confirm(`⚠️ ¿Estás seguro de ELIMINAR el producto ${sku}? Esta acción no se puede deshacer.`)) return;
     
@@ -518,7 +516,7 @@ function limpiarYTerminarVenta(btn) {
     btn.innerText = "✅ Cobrar e Imprimir"; 
 }
 
-// 8. ALERTAS Y ÓRDENES DE COMPRA ACTUALIZADAS
+// 8. ALERTAS, ÓRDENES DE COMPRA Y PROVEEDORES
 window.renderAgotados = () => {
     const tb = document.getElementById('tablaAgotadosBody');
     const filtroTipo = document.getElementById('alerta_filtro_tipo').value;
@@ -564,7 +562,8 @@ window.renderAgotados = () => {
     });
     tb.innerHTML = h || "<tr><td colspan='4' class='p-8 text-center font-bold text-green-600'>✅ Todo en orden. Sin alertas actuales.</td></tr>";
 };
-// --- MÓDULO EDITABLE DE ÓRDENES DE COMPRA (COMPATIBLE CON CELULAR) ---
+
+// --- MÓDULO EDITABLE DE ÓRDENES DE COMPRA ---
 window.generarOrdenCompra = () => {
     let faltantes = window.inventarioLocal.filter(p => p.stock <= (p.min_stk || 0));
     
@@ -572,7 +571,7 @@ window.generarOrdenCompra = () => {
         return alert("✅ Todo el inventario está por encima del mínimo. No se requiere orden de compra.");
     }
 
-    // Blindaje: Forzamos a que todo se lea como texto (String) para que no se trabe si hay números
+    // BLINDAJE: Evita que productos guardados por error sin nombre traben el sistema
     faltantes.sort((a,b) => {
         let provA = String(a.proveedor || "Z_Sin Proveedor");
         let provB = String(b.proveedor || "Z_Sin Proveedor");
@@ -645,7 +644,6 @@ window.imprimirOrdenCompra = () => {
     filterPedir.forEach(p => {
         let subCosto = (p.costo || 0) * p.pedir;
         totalCosto += subCosto;
-        // También protegemos el nombre aquí usando String()
         tkF += `<tr>
             <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${p.sku}</td>
             <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${String(p.nombre).substring(0,20)}</td>
@@ -670,7 +668,6 @@ window.imprimirOrdenCompra = () => {
         <p style="margin-top:20px; border-top:1px dashed black; padding-top:5px; text-align:center;">Firma de Autorización</p>
         </body></html>`;
 
-    // Regresamos al método del iframe oculto que es 100% compatible con móviles
     let ifr = document.getElementById('iframeImpresion');
     if(!ifr) {
         ifr = document.createElement('iframe');
