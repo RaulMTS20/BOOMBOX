@@ -314,7 +314,7 @@ window.renderInventarioPantalla = () => {
         if (p.precio_promo && p.precio_promo > 0) precioStr = `<span class="text-xs text-red-500 line-through block">$${p.precio}</span><span class="text-green-600 font-bold block">$${p.precio_promo} <span class="text-[10px] text-red-500 font-normal">(Promo)</span></span>`;
         if (p.cant_mayoreo > 0 && p.precio_mayoreo > 0) precioStr += `<span class="text-xs text-blue-600 font-bold block mt-1">$${p.precio_mayoreo} <span class="text-gray-500 font-normal">(x${p.cant_mayoreo}+)</span></span>`;
         
-        h += `<tr class="border-b hover:bg-gray-50"><td class="p-3 font-mono text-gray-500 text-xs">${p.sku}</td><td class="p-3 font-bold">${p.nombre}</td><td class="p-3">${badges}</td><td class="p-3 text-center font-black ${p.stock<=(p.min_stk||0)?'text-red-500':''}">${stockVal}</td>${cc}<td class="p-3 text-left">${precioStr}</td>${ca}</tr>`;
+       h += `<tr class="border-b hover:bg-gray-50"><td class="p-3 font-mono text-gray-500 text-xs hidden">${p.sku}</td><td class="p-3 font-bold">${p.nombre}</td><td class="p-3">${badges}</td><td class="p-3 text-center font-black ${p.stock<=(p.min_stk||0)?'text-red-500':''}">${stockVal}</td>${cc}<td class="p-3 text-left">${precioStr}</td>${ca}</tr>`; 
     }); 
     tb.innerHTML = h || "<tr><td colspan='7' class='text-center p-8 text-gray-500'>No hay productos que coincidan con el filtro</td></tr>";
 };
@@ -579,10 +579,13 @@ window.generarOrdenCompra = () => {
         return alert("✅ Todo el inventario está por encima del mínimo. No se requiere orden de compra.");
     }
 
+    // Le pusimos un seguro por si un producto se guardó sin nombre, para que no trabe el sistema
     faltantes.sort((a,b) => {
         let provA = a.proveedor || "Z_Sin Proveedor";
         let provB = b.proveedor || "Z_Sin Proveedor";
-        return provA.localeCompare(provB) || a.nombre.localeCompare(b.nombre);
+        let nomA = a.nombre || "";
+        let nomB = b.nombre || "";
+        return provA.localeCompare(provB) || nomA.localeCompare(nomB);
     });
 
     window.ordenCompraActual = faltantes.map(p => {
@@ -631,7 +634,6 @@ window.actualizarCantOrden = (idx, val) => {
 window.cerrarModalOrden = () => {
     document.getElementById('modalOrdenCompra').classList.add('hidden');
 };
-
 window.imprimirOrdenCompra = () => {
     const z = document.getElementById('zonaSelect').value;
     const u = localStorage.getItem('currentUser');
@@ -659,6 +661,35 @@ window.imprimirOrdenCompra = () => {
         </tr>`;
     });
 
+    const htmlTk = `<html><head><title>${e}</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:'Courier New',monospace;font-size:12px;margin:0;padding:10px;}h2,p{margin:2px 0;text-align:center;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{border-bottom:1px dashed black;text-align:left;font-size:11px;}</style></head><body>
+        <h2>${e}</h2>
+        <p style="font-weight:bold; font-size:14px; margin: 4px 0;">ORDEN DE COMPRA</p>
+        <p>Sucursal: ${z}</p>
+        <p>Fecha: ${f}</p>
+        <p>Usuario: ${u}</p>
+        <table>
+            <thead><tr><th>SKU</th><th>Prod</th><th>Prov</th><th style="text-align:center;">Pedir</th><th style="text-align:right;">Costo</th><th style="text-align:right;">Sub</th></tr></thead>
+            <tbody>${tkF}</tbody>
+        </table>
+        <h3 style="text-align:right; margin-top:10px;">TOTAL EST.: $${totalCosto.toFixed(2)}</h3>
+        <p style="margin-top:20px; border-top:1px dashed black; padding-top:5px; text-align:center;">Firma de Autorización</p>
+        <script>
+            window.onload = function() { window.print(); window.close(); }
+        </script>
+        </body></html>`;
+
+    // En celulares, abrir una nueva pestaña es la forma más segura de invocar la impresora
+    const ventanaImpresion = window.open('', '_blank');
+    if (ventanaImpresion) {
+        ventanaImpresion.document.open();
+        ventanaImpresion.document.write(htmlTk);
+        ventanaImpresion.document.close();
+        window.cerrarModalOrden();
+        window.mostrarNotificacion("🖨️ Orden enviada a imprimir");
+    } else {
+        alert("Por favor permite las ventanas emergentes (pop-ups) en tu navegador para poder imprimir.");
+    }
+};
     // REEMPLAZAMOS EL TÍTULO y cambiamos "Generó" por "Usuario"
     const htmlTk = `<html><head><title>${e}</title><style>body{font-family:'Courier New',monospace;font-size:12px;margin:0;padding:10px;width:80mm;}h2,p{margin:2px 0;text-align:center;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{border-bottom:1px dashed black;text-align:left;font-size:11px;}</style></head><body>
         <h2>${e}</h2>
