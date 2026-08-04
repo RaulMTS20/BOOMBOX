@@ -93,11 +93,9 @@ window.registrarNegocio = async () => {
     btn.innerText = "Creando base de datos..."; btn.disabled = true;
     
     try { 
-        // Generamos la credencial segura
         const cred = await createUserWithEmailAndPassword(auth, em, p); 
-        const uid = cred.user.uid; // ID de máxima seguridad de Google
+        const uid = cred.user.uid; 
         
-        // Guardamos el directorio y el perfil ligados al UID
         await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
         await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: e.replace(/\s+/g, ''), zonas: [z], rol: "Dueño", usuario: u }); 
         
@@ -127,7 +125,6 @@ window.iniciarSesion = async () => {
         const cred = await signInWithEmailAndPassword(auth, dirDoc.data().email, p); 
         const uid = cred.user.uid;
         
-        // Buscamos el perfil usando el UID seguro
         const userDoc = await getDoc(doc(db, "SaaS_Usuarios", uid));
         
         if (userDoc.exists()) { 
@@ -196,8 +193,7 @@ function iniciarApp() {
     } catch (err) { window.cerrarSesion(); }
 }
 
-// 5. CÁMARA
-// 5. CÁMARA
+// 5. CÁMARA (ACTUALIZADA CON REGISTRO RÁPIDO)
 let scanners = { ventas: null, ingreso: null };
 window.iniciarCamara = (m) => { 
     document.getElementById(`reader-${m}`).classList.remove('hidden'); 
@@ -214,12 +210,8 @@ window.iniciarCamara = (m) => {
             if(p) {
                 window.agregarAlCarrito(p); 
             } else {
-                // --- NUEVA MAGIA AQUÍ ---
-                // 1. Pegamos el código escaneado en el buscador
                 document.getElementById('venta_busqueda').value = decodedText;
-                // 2. Abrimos la ventana de registro
                 window.abrirModalRegistroRapido();
-                // 3. Le avisamos al usuario
                 window.mostrarNotificacion("⚠️ Nuevo producto detectado. Regístralo.");
             }
         } else { 
@@ -295,6 +287,8 @@ window.renderInventarioPantalla = () => {
         const isManager = (r === 'Dueño' || r === 'Gerente');
         
         const cc = isManager ? `<td class="p-3 text-left costo-col">$${p.costo || 0}</td>` : `<td class="p-3 text-left costo-col hidden"></td>`;
+        
+        // BOTONES CON PURO ICONO
         const ca = isManager ? `<td class="p-3 text-center accion-col md:min-w-[200px]">
             <button onclick="abrirModalEdicion('${p.sku}')" class="text-blue-600 bg-blue-50 px-3 py-2 rounded font-bold hover:bg-blue-100 transition mb-1 md:mb-0 md:mr-2 text-lg" title="Editar">✏️</button>
             <button onclick="eliminarProducto('${p.sku}')" class="text-red-600 bg-red-50 px-3 py-2 rounded font-bold hover:bg-red-100 transition text-lg" title="Borrar">🗑️</button>
@@ -314,7 +308,8 @@ window.renderInventarioPantalla = () => {
         if (p.precio_promo && p.precio_promo > 0) precioStr = `<span class="text-xs text-red-500 line-through block">$${p.precio}</span><span class="text-green-600 font-bold block">$${p.precio_promo} <span class="text-[10px] text-red-500 font-normal">(Promo)</span></span>`;
         if (p.cant_mayoreo > 0 && p.precio_mayoreo > 0) precioStr += `<span class="text-xs text-blue-600 font-bold block mt-1">$${p.precio_mayoreo} <span class="text-gray-500 font-normal">(x${p.cant_mayoreo}+)</span></span>`;
         
-       h += `<tr class="border-b hover:bg-gray-50"><td class="p-3 font-mono text-gray-500 text-xs hidden">${p.sku}</td><td class="p-3 font-bold">${p.nombre}</td><td class="p-3">${badges}</td><td class="p-3 text-center font-black ${p.stock<=(p.min_stk||0)?'text-red-500':''}">${stockVal}</td>${cc}<td class="p-3 text-left">${precioStr}</td>${ca}</tr>`; 
+        // LA CELDA DEL SKU AHORA TIENE LA CLASE "hidden"
+        h += `<tr class="border-b hover:bg-gray-50"><td class="p-3 font-mono text-gray-500 text-xs hidden">${p.sku}</td><td class="p-3 font-bold">${p.nombre}</td><td class="p-3">${badges}</td><td class="p-3 text-center font-black ${p.stock<=(p.min_stk||0)?'text-red-500':''}">${stockVal}</td>${cc}<td class="p-3 text-left">${precioStr}</td>${ca}</tr>`; 
     }); 
     tb.innerHTML = h || "<tr><td colspan='7' class='text-center p-8 text-gray-500'>No hay productos que coincidan con el filtro</td></tr>";
 };
@@ -484,7 +479,6 @@ window.procesarVentaCompleta = async () => {
             }
         }
         
-        // REEMPLAZAMOS EL TÍTULO "BOOMBOX" POR EL NOMBRE DE LA EMPRESA (e)
         const htmlTk = `<html><head><title>${e}</title><style>body{font-family:'Courier New',monospace;font-size:12px;margin:0;padding:10px;width:80mm;}h2,p{margin:2px 0;text-align:center;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{border-bottom:1px dashed black;text-align:left;}</style></head><body><h2>${e}</h2><p>Sucursal: ${z}</p><p>Folio: ${fol}</p><p>Fecha: ${f}</p><p>Usuario: ${u}</p><table><thead><tr><th>Cant</th><th>Prod</th><th style="text-align:right;">Total</th></tr></thead><tbody>${tkF}</tbody></table><h3 style="text-align:right;margin-top:10px;">TOTAL: $${tot.toFixed(2)}</h3></body></html>`;
         
         if (quiereImprimir) {
@@ -524,7 +518,7 @@ function limpiarYTerminarVenta(btn) {
     btn.innerText = "✅ Cobrar e Imprimir"; 
 }
 
-// 8. ALERTAS, ÓRDENES DE COMPRA Y PROVEEDORES
+// 8. ALERTAS Y ÓRDENES DE COMPRA ACTUALIZADAS
 window.renderAgotados = () => {
     const tb = document.getElementById('tablaAgotadosBody');
     const filtroTipo = document.getElementById('alerta_filtro_tipo').value;
@@ -571,7 +565,7 @@ window.renderAgotados = () => {
     tb.innerHTML = h || "<tr><td colspan='4' class='p-8 text-center font-bold text-green-600'>✅ Todo en orden. Sin alertas actuales.</td></tr>";
 };
 
-// ----- MÓDULO EDITABLE DE ÓRDENES DE COMPRA -----
+// --- MÓDULO EDITABLE DE ÓRDENES DE COMPRA (COMPATIBLE CON CELULAR) ---
 window.generarOrdenCompra = () => {
     let faltantes = window.inventarioLocal.filter(p => p.stock <= (p.min_stk || 0));
     
@@ -579,7 +573,7 @@ window.generarOrdenCompra = () => {
         return alert("✅ Todo el inventario está por encima del mínimo. No se requiere orden de compra.");
     }
 
-    // Le pusimos un seguro por si un producto se guardó sin nombre, para que no trabe el sistema
+    // Seguro de ordenamiento por si falta algún nombre
     faltantes.sort((a,b) => {
         let provA = a.proveedor || "Z_Sin Proveedor";
         let provB = b.proveedor || "Z_Sin Proveedor";
@@ -634,10 +628,11 @@ window.actualizarCantOrden = (idx, val) => {
 window.cerrarModalOrden = () => {
     document.getElementById('modalOrdenCompra').classList.add('hidden');
 };
+
 window.imprimirOrdenCompra = () => {
     const z = document.getElementById('zonaSelect').value;
     const u = localStorage.getItem('currentUser');
-    const e = localStorage.getItem('empresaId'); // Nombre del negocio
+    const e = localStorage.getItem('empresaId'); 
     const ts = Date.now();
     const f = new Date(ts).toLocaleString('es-MX');
 
@@ -646,7 +641,7 @@ window.imprimirOrdenCompra = () => {
     
     let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); 
 
-    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada. Modifica las celdas azules de 'Cant. a Pedir'.");
+    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada.");
 
     filterPedir.forEach(p => {
         let subCosto = (p.costo || 0) * p.pedir;
@@ -690,41 +685,6 @@ window.imprimirOrdenCompra = () => {
         alert("Por favor permite las ventanas emergentes (pop-ups) en tu navegador para poder imprimir.");
     }
 };
-    // REEMPLAZAMOS EL TÍTULO y cambiamos "Generó" por "Usuario"
-    const htmlTk = `<html><head><title>${e}</title><style>body{font-family:'Courier New',monospace;font-size:12px;margin:0;padding:10px;width:80mm;}h2,p{margin:2px 0;text-align:center;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{border-bottom:1px dashed black;text-align:left;font-size:11px;}</style></head><body>
-        <h2>${e}</h2>
-        <p style="font-weight:bold; font-size:14px; margin: 4px 0;">ORDEN DE COMPRA</p>
-        <p>Sucursal: ${z}</p>
-        <p>Fecha: ${f}</p>
-        <p>Usuario: ${u}</p>
-        <table>
-            <thead><tr><th>SKU</th><th>Prod</th><th>Prov</th><th style="text-align:center;">Pedir</th><th style="text-align:right;">Costo</th><th style="text-align:right;">Sub</th></tr></thead>
-            <tbody>${tkF}</tbody>
-        </table>
-        <h3 style="text-align:right; margin-top:10px;">TOTAL EST.: $${totalCosto.toFixed(2)}</h3>
-        <p style="margin-top:20px; border-top:1px dashed black; padding-top:5px; text-align:center;">Firma de Autorización</p>
-        </body></html>`;
-
-    let ifr = document.getElementById('iframeImpresion');
-    if(!ifr) {
-        ifr = document.createElement('iframe');
-        ifr.id = 'iframeImpresion';
-        ifr.style.display = 'none';
-        document.body.appendChild(ifr);
-    }
-
-    ifr.contentWindow.document.open();
-    ifr.contentWindow.document.write(htmlTk);
-    ifr.contentWindow.document.close();
-
-    setTimeout(() => {
-        ifr.contentWindow.focus();
-        ifr.contentWindow.print();
-        window.cerrarModalOrden();
-        window.mostrarNotificacion("🖨️ Orden impresa correctamente");
-    }, 500);
-};
-// ----------------------------------------------
 
 window.guardarProveedor = async () => {
     const nom = document.getElementById('prov_nombre').value.trim();
@@ -1085,6 +1045,7 @@ window.agregarNuevaZona = async () => {
 if(localStorage.getItem('currentUser')) {
     iniciarApp();
 }
+
 // ==========================================
 // REGISTRO RÁPIDO EN PUNTO DE VENTA
 // ==========================================
@@ -1126,14 +1087,12 @@ window.guardarRegistroRapido = async () => {
     const ts = Date.now(); 
     const f = new Date(ts).toLocaleString('es-MX');
 
-    // Deshabilitar botón mientras guarda para evitar duplicados
     const btn = document.querySelector('#modal-registro-rapido button[onclick="guardarRegistroRapido()"]');
     const btnOriginalText = btn.innerHTML;
     btn.innerHTML = '⏳ Guardando...';
     btn.disabled = true;
 
     try {
-        // 1. Crear el objeto del producto con tu estructura exacta
         const nuevoProducto = { 
             sku: sku, 
             nombre: nom, 
@@ -1144,7 +1103,7 @@ window.guardarRegistroRapido = async () => {
             precio_mayoreo: 0, 
             cant_mayoreo: 0, 
             es_granel: false, 
-            stock: 0, // Entra con stock 0 en la BD
+            stock: 0, 
             min_stk: 0, 
             max_stk: 0, 
             caducidad: null, 
@@ -1152,23 +1111,17 @@ window.guardarRegistroRapido = async () => {
             precio_promo: 0 
         };
 
-        // 2. Guardar en Firebase (En el inventario y en el Kardex)
         const r = `${e}_Inventario_${z}`; 
         await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); 
         await addDoc(collection(db, `${e}_Historial_Ingresos`), { 
             sku: sku, nombre: nom, cantidad: 0, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA_EXPRESS" 
         });
 
-        // 3. Agregarlo a la memoria local para que el buscador lo reconozca después
         window.inventarioLocal.push(nuevoProducto);
 
-        // 4. Cerrar la ventana y limpiar el buscador
         window.cerrarModalRegistroRapido();
         document.getElementById('venta_busqueda').value = '';
         
-        // 5. Agregar al carrito inmediatamente. 
-        // Le ponemos un stock virtual alto solo para pasar el candado de tu carrito.
-        // Al cobrar, Firebase hará la resta correcta (0 - 1 = -1), lo cual es normal en punto de venta.
         const productoParaCarrito = { ...nuevoProducto, stock: 9999 };
         window.agregarAlCarrito(productoParaCarrito);
         
