@@ -564,7 +564,6 @@ window.renderAgotados = () => {
     });
     tb.innerHTML = h || "<tr><td colspan='4' class='p-8 text-center font-bold text-green-600'>✅ Todo en orden. Sin alertas actuales.</td></tr>";
 };
-
 // --- MÓDULO EDITABLE DE ÓRDENES DE COMPRA (COMPATIBLE CON CELULAR) ---
 window.generarOrdenCompra = () => {
     let faltantes = window.inventarioLocal.filter(p => p.stock <= (p.min_stk || 0));
@@ -573,12 +572,12 @@ window.generarOrdenCompra = () => {
         return alert("✅ Todo el inventario está por encima del mínimo. No se requiere orden de compra.");
     }
 
-    // Seguro de ordenamiento por si falta algún nombre
+    // Blindaje: Forzamos a que todo se lea como texto (String) para que no se trabe si hay números
     faltantes.sort((a,b) => {
-        let provA = a.proveedor || "Z_Sin Proveedor";
-        let provB = b.proveedor || "Z_Sin Proveedor";
-        let nomA = a.nombre || "";
-        let nomB = b.nombre || "";
+        let provA = String(a.proveedor || "Z_Sin Proveedor");
+        let provB = String(b.proveedor || "Z_Sin Proveedor");
+        let nomA = String(a.nombre || "");
+        let nomB = String(b.nombre || "");
         return provA.localeCompare(provB) || nomA.localeCompare(nomB);
     });
 
@@ -646,9 +645,10 @@ window.imprimirOrdenCompra = () => {
     filterPedir.forEach(p => {
         let subCosto = (p.costo || 0) * p.pedir;
         totalCosto += subCosto;
+        // También protegemos el nombre aquí usando String()
         tkF += `<tr>
             <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${p.sku}</td>
-            <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${p.nombre.substring(0,20)}</td>
+            <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${String(p.nombre).substring(0,20)}</td>
             <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${p.proveedor || '--'}</td>
             <td style="padding:4px 0; border-bottom:1px dashed #ccc; text-align:center; font-size:10px; font-weight:bold;">${p.pedir}</td>
             <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px; text-align:right;">$${(p.costo || 0).toFixed(2)}</td>
@@ -668,22 +668,27 @@ window.imprimirOrdenCompra = () => {
         </table>
         <h3 style="text-align:right; margin-top:10px;">TOTAL EST.: $${totalCosto.toFixed(2)}</h3>
         <p style="margin-top:20px; border-top:1px dashed black; padding-top:5px; text-align:center;">Firma de Autorización</p>
-        <script>
-            window.onload = function() { window.print(); window.close(); }
-        </script>
         </body></html>`;
 
-    // En celulares, abrir una nueva pestaña es la forma más segura de invocar la impresora
-    const ventanaImpresion = window.open('', '_blank');
-    if (ventanaImpresion) {
-        ventanaImpresion.document.open();
-        ventanaImpresion.document.write(htmlTk);
-        ventanaImpresion.document.close();
+    // Regresamos al método del iframe oculto que es 100% compatible con móviles
+    let ifr = document.getElementById('iframeImpresion');
+    if(!ifr) {
+        ifr = document.createElement('iframe');
+        ifr.id = 'iframeImpresion';
+        ifr.style.display = 'none';
+        document.body.appendChild(ifr);
+    }
+
+    ifr.contentWindow.document.open();
+    ifr.contentWindow.document.write(htmlTk);
+    ifr.contentWindow.document.close();
+
+    setTimeout(() => {
+        ifr.contentWindow.focus();
+        ifr.contentWindow.print();
         window.cerrarModalOrden();
         window.mostrarNotificacion("🖨️ Orden enviada a imprimir");
-    } else {
-        alert("Por favor permite las ventanas emergentes (pop-ups) en tu navegador para poder imprimir.");
-    }
+    }, 500);
 };
 
 window.guardarProveedor = async () => {
