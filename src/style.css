@@ -21,3 +21,32 @@
 
 .toggle-checkbox:checked { right: 0; border-color: #10b981; }
 .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
+/* =========================================
+   AJUSTES PARA VISTA MÓVIL (CELULARES)
+   ========================================= */
+@media screen and (max-width: 768px) {
+    /* Compactar las tablas */
+    table {
+        font-size: 13px; /* Letra un poco más pequeña */
+    }
+    
+    th, td {
+        padding: 8px 5px !important; /* Reducir espacios horizontales entre columnas */
+        white-space: nowrap; /* Evitar que el texto se rompa en varias líneas de forma extraña */
+    }
+
+    /* Asegurar que las tablas tengan su propio scroll horizontal si son muy anchas */
+    .table-responsive, 
+    div[style*="overflow-x: auto"] {
+        width: 100%;
+        display: block;
+        -webkit-overflow-scrolling: touch; /* Scroll más fluido en celulares */
+    }
+
+    /* Hacer el menú superior de pestañas más compacto */
+    .nav-tabs button, 
+    .tab-button {
+        padding: 8px 12px;
+        font-size: 13px;
+    }
+}

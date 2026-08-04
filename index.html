@@ -181,10 +181,16 @@
                     <div class="bg-white p-6 rounded-lg shadow-md h-fit">
                         <h2 class="text-xl font-bold mb-4 flex items-center gap-2">🛒 Agregar Producto</h2>
                         
-                        <div class="relative w-full mb-4">
-                            <input type="text" id="venta_busqueda" onkeyup="filtrarProductosVenta()" placeholder="Busca SKU o Nombre..." class="p-4 border-2 rounded-lg w-full focus:ring-2 focus:ring-orange-500 text-lg shadow-inner" autocomplete="off">
-                            <div id="sugerencias_venta" class="absolute z-50 w-full bg-white border rounded-b-lg shadow-xl hidden max-h-48 overflow-y-auto"></div>
-                        </div>
+                        <div class="flex gap-2 mb-4">
+    <div class="relative w-full">
+        <input type="text" id="venta_busqueda" onkeyup="filtrarProductosVenta()" placeholder="Busca SKU o Nombre..." class="p-4 border-2 rounded-lg w-full focus:ring-2 focus:ring-orange-500 text-lg shadow-inner" autocomplete="off">
+        <div id="sugerencias_venta" class="absolute z-50 w-full bg-white border rounded-b-lg shadow-xl hidden max-h-48 overflow-y-auto"></div>
+    </div>
+    <!-- Botón de Registro Rápido -->
+    <button type="button" onclick="abrirModalRegistroRapido()" class="bg-blue-600 hover:bg-blue-800 text-white font-bold px-4 py-2 rounded-lg shadow-md flex items-center justify-center whitespace-nowrap transition" title="Registrar producto nuevo al instante">
+        ➕ Nuevo
+    </button>
+</div>
 
                         <div class="text-center my-4 font-bold text-gray-300 relative">
                             <hr class="absolute top-1/2 w-full border-gray-200">
@@ -480,5 +486,42 @@
 
     <!-- Cerebro de Vite -->
     <script type="module" src="/src/main.js"></script>
+    <!-- MODAL REGISTRO RÁPIDO -->
+<div id="modal-registro-rapido" class="hidden fixed inset-0 bg-black bg-opacity-60 z-[100] flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div class="bg-blue-600 p-4 flex justify-between items-center text-white">
+            <h3 class="font-bold text-lg flex items-center gap-2">⚡ Registro Express</h3>
+            <button onclick="cerrarModalRegistroRapido()" class="font-bold text-2xl hover:text-gray-200 leading-none">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <p class="text-sm text-gray-500 mb-2">Da de alta un producto nuevo para cobrarlo inmediatamente.</p>
+            
+            <div>
+                <label class="block text-gray-700 font-bold mb-1 text-sm">SKU / Código de Barras</label>
+                <input type="text" id="rr_sku" class="w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-50 font-mono">
+            </div>
+            
+            <div>
+                <label class="block text-gray-700 font-bold mb-1 text-sm">Nombre del Producto</label>
+                <input type="text" id="rr_nombre" class="w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 uppercase">
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-gray-700 font-bold mb-1 text-sm">Costo ($)</label>
+                    <input type="number" id="rr_costo" class="w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500" placeholder="0.00">
+                </div>
+                <div>
+                    <label class="block text-gray-700 font-bold mb-1 text-sm">Precio Venta ($)</label>
+                    <input type="number" id="rr_precio" class="w-full p-3 border-2 rounded-lg focus:ring-2 focus:ring-blue-500 text-green-700 font-bold" placeholder="0.00">
+                </div>
+            </div>
+            
+            <button onclick="guardarRegistroRapido()" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-4 rounded-lg mt-2 shadow-lg transition text-lg flex justify-center items-center gap-2">
+                💾 Guardar y Agregar
+            </button>
+        </div>
+    </div>
+</div>
 </body>
 </html>

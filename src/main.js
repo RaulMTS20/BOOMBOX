@@ -1042,3 +1042,100 @@ window.agregarNuevaZona = async () => {
 if(localStorage.getItem('currentUser')) {
     iniciarApp();
 }
+// ==========================================
+// REGISTRO RÁPIDO EN PUNTO DE VENTA
+// ==========================================
+window.abrirModalRegistroRapido = () => {
+    const busquedaActual = document.getElementById('venta_busqueda').value;
+    
+    document.getElementById('rr_sku').value = busquedaActual.trim();
+    document.getElementById('rr_nombre').value = '';
+    document.getElementById('rr_costo').value = '';
+    document.getElementById('rr_precio').value = '';
+    
+    document.getElementById('modal-registro-rapido').classList.remove('hidden');
+    
+    if(busquedaActual !== "") {
+        document.getElementById('rr_nombre').focus();
+    } else {
+        document.getElementById('rr_sku').focus();
+    }
+};
+
+window.cerrarModalRegistroRapido = () => {
+    document.getElementById('modal-registro-rapido').classList.add('hidden');
+    document.getElementById('venta_busqueda').focus(); 
+};
+
+window.guardarRegistroRapido = async () => {
+    const sku = document.getElementById('rr_sku').value.trim();
+    const nom = document.getElementById('rr_nombre').value.trim().toUpperCase();
+    const cos = parseFloat(document.getElementById('rr_costo').value) || 0;
+    const pre = parseFloat(document.getElementById('rr_precio').value) || 0;
+
+    if (!sku || !nom || pre <= 0) {
+        return alert('Por favor, ingresa SKU, Nombre y un Precio de Venta válido (mayor a 0).');
+    }
+
+    const z = document.getElementById('zonaSelect').value; 
+    const e = localStorage.getItem('empresaId'); 
+    const u = localStorage.getItem('currentUser'); 
+    const ts = Date.now(); 
+    const f = new Date(ts).toLocaleString('es-MX');
+
+    // Deshabilitar botón mientras guarda para evitar duplicados
+    const btn = document.querySelector('#modal-registro-rapido button[onclick="guardarRegistroRapido()"]');
+    const btnOriginalText = btn.innerHTML;
+    btn.innerHTML = '⏳ Guardando...';
+    btn.disabled = true;
+
+    try {
+        // 1. Crear el objeto del producto con tu estructura exacta
+        const nuevoProducto = { 
+            sku: sku, 
+            nombre: nom, 
+            categoria: "General", 
+            proveedor: "", 
+            costo: cos, 
+            precio: pre, 
+            precio_mayoreo: 0, 
+            cant_mayoreo: 0, 
+            es_granel: false, 
+            stock: 0, // Entra con stock 0 en la BD
+            min_stk: 0, 
+            max_stk: 0, 
+            caducidad: null, 
+            zona: z, 
+            precio_promo: 0 
+        };
+
+        // 2. Guardar en Firebase (En el inventario y en el Kardex)
+        const r = `${e}_Inventario_${z}`; 
+        await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); 
+        await addDoc(collection(db, `${e}_Historial_Ingresos`), { 
+            sku: sku, nombre: nom, cantidad: 0, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA_EXPRESS" 
+        });
+
+        // 3. Agregarlo a la memoria local para que el buscador lo reconozca después
+        window.inventarioLocal.push(nuevoProducto);
+
+        // 4. Cerrar la ventana y limpiar el buscador
+        window.cerrarModalRegistroRapido();
+        document.getElementById('venta_busqueda').value = '';
+        
+        // 5. Agregar al carrito inmediatamente. 
+        // Le ponemos un stock virtual alto solo para pasar el candado de tu carrito.
+        // Al cobrar, Firebase hará la resta correcta (0 - 1 = -1), lo cual es normal en punto de venta.
+        const productoParaCarrito = { ...nuevoProducto, stock: 9999 };
+        window.agregarAlCarrito(productoParaCarrito);
+        
+        window.mostrarNotificacion('✅ Producto express guardado y listo para cobro.');
+        
+    } catch (error) {
+        console.error(error);
+        alert('Hubo un error al registrar el producto en la base de datos.');
+    } finally {
+        btn.innerHTML = btnOriginalText;
+        btn.disabled = false;
+    }
+};
