@@ -295,9 +295,9 @@ window.renderInventarioPantalla = () => {
         const isManager = (r === 'Dueño' || r === 'Gerente');
         
         const cc = isManager ? `<td class="p-3 text-left costo-col">$${p.costo || 0}</td>` : `<td class="p-3 text-left costo-col hidden"></td>`;
-        const ca = isManager ? `<td class="p-3 text-center accion-col min-w-[200px]">
-            <button onclick="abrirModalEdicion('${p.sku}')" class="text-blue-600 bg-blue-50 px-3 py-2 rounded font-bold hover:bg-blue-100 transition mb-1 md:mb-0 md:mr-2">✏️ Editar</button>
-            <button onclick="eliminarProducto('${p.sku}')" class="text-red-600 bg-red-50 px-3 py-2 rounded font-bold hover:bg-red-100 transition">🗑️ Borrar</button>
+        const ca = isManager ? `<td class="p-3 text-center accion-col md:min-w-[200px]">
+            <button onclick="abrirModalEdicion('${p.sku}')" class="text-blue-600 bg-blue-50 px-3 py-2 rounded font-bold hover:bg-blue-100 transition mb-1 md:mb-0 md:mr-2 text-lg" title="Editar">✏️</button>
+            <button onclick="eliminarProducto('${p.sku}')" class="text-red-600 bg-red-50 px-3 py-2 rounded font-bold hover:bg-red-100 transition text-lg" title="Borrar">🗑️</button>
         </td>` : `<td class="p-3 text-left accion-col hidden"></td>`;
         
         const stockVal = p.stock % 1 !== 0 ? p.stock.toFixed(3) : p.stock;
