@@ -197,6 +197,7 @@ function iniciarApp() {
 }
 
 // 5. CÁMARA
+// 5. CÁMARA
 let scanners = { ventas: null, ingreso: null };
 window.iniciarCamara = (m) => { 
     document.getElementById(`reader-${m}`).classList.remove('hidden'); 
@@ -207,9 +208,20 @@ window.iniciarCamara = (m) => {
     scanners[m].start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (decodedText) => {
         window.detenerCamara(m); 
         if (navigator.vibrate) navigator.vibrate(100); 
+        
         if(m === 'ventas') { 
             const p = window.inventarioLocal.find(x => x.sku === decodedText); 
-            if(p) window.agregarAlCarrito(p); else alert("SKU no encontrado."); 
+            if(p) {
+                window.agregarAlCarrito(p); 
+            } else {
+                // --- NUEVA MAGIA AQUÍ ---
+                // 1. Pegamos el código escaneado en el buscador
+                document.getElementById('venta_busqueda').value = decodedText;
+                // 2. Abrimos la ventana de registro
+                window.abrirModalRegistroRapido();
+                // 3. Le avisamos al usuario
+                window.mostrarNotificacion("⚠️ Nuevo producto detectado. Regístralo.");
+            }
         } else { 
             document.getElementById('p_sku').value = decodedText; 
         }

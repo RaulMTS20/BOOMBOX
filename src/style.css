@@ -22,31 +22,33 @@
 .toggle-checkbox:checked { right: 0; border-color: #10b981; }
 .toggle-checkbox:checked + .toggle-label { background-color: #10b981; }
 /* =========================================
+  /* =========================================
    AJUSTES PARA VISTA MÓVIL (CELULARES)
    ========================================= */
 @media screen and (max-width: 768px) {
-    /* Compactar las tablas */
+    /* Compactar las tablas y permitir salto de línea */
     table {
-        font-size: 13px; /* Letra un poco más pequeña */
+        font-size: 11px !important; 
     }
     
     th, td {
-        padding: 8px 5px !important; /* Reducir espacios horizontales entre columnas */
-        white-space: nowrap; /* Evitar que el texto se rompa en varias líneas de forma extraña */
+        padding: 6px 4px !important; /* Reducir espacios al mínimo */
+        white-space: normal !important; /* ESTO PERMITE QUE LOS NOMBRES LARGOS BAJEN A OTRA LÍNEA */
+        word-wrap: break-word;
     }
 
-    /* Asegurar que las tablas tengan su propio scroll horizontal si son muy anchas */
+    /* Asegurar scroll fluido si aún es necesario */
     .table-responsive, 
     div[style*="overflow-x: auto"] {
         width: 100%;
         display: block;
-        -webkit-overflow-scrolling: touch; /* Scroll más fluido en celulares */
+        -webkit-overflow-scrolling: touch;
     }
 
-    /* Hacer el menú superior de pestañas más compacto */
+    /* Pestañas de arriba más compactas */
     .nav-tabs button, 
     .tab-button {
-        padding: 8px 12px;
-        font-size: 13px;
+        padding: 8px 10px;
+        font-size: 12px;
     }
 }
