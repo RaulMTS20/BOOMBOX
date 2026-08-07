@@ -627,65 +627,38 @@ window.cerrarModalOrden = () => {
     document.getElementById('modalOrdenCompra').classList.add('hidden');
 };
 
-window.imprimirOrdenCompra = () => {
-    const z = document.getElementById('zonaSelect').value;
-    const u = localStorage.getItem('currentUser');
+window.enviarOrdenWhatsApp = () => {
     const e = localStorage.getItem('empresaId'); 
-    const ts = Date.now();
-    const f = new Date(ts).toLocaleString('es-MX');
-
-    let tkF = "";
-    let totalCosto = 0;
+    const z = document.getElementById('zonaSelect').value;
     
+    // Filtramos solo los productos que tengan un número mayor a 0 en la caja azul
     let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); 
 
-    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada.");
+    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada. Modifica las celdas de 'Cant. a Pedir'.");
 
+    // Armamos el encabezado del mensaje
+    let textoMensaje = `📋 *NUEVA ORDEN DE COMPRA*\n🏢 *Negocio:* ${e}\n📍 *Sucursal:* ${z}\n\n*Productos solicitados:*\n`;
+    let totalCosto = 0;
+
+    // Agregamos cada producto editado a la lista
     filterPedir.forEach(p => {
-        let subCosto = (p.costo || 0) * p.pedir;
+        let subCosto = (parseFloat(p.costo) || 0) * p.pedir;
         totalCosto += subCosto;
-        tkF += `<tr>
-            <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${p.sku}</td>
-            <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${String(p.nombre).substring(0,20)}</td>
-            <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px;">${p.proveedor || '--'}</td>
-            <td style="padding:4px 0; border-bottom:1px dashed #ccc; text-align:center; font-size:10px; font-weight:bold;">${p.pedir}</td>
-            <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px; text-align:right;">$${(p.costo || 0).toFixed(2)}</td>
-            <td style="padding:4px 0; border-bottom:1px dashed #ccc; font-size:10px; text-align:right;">$${subCosto.toFixed(2)}</td>
-        </tr>`;
+        textoMensaje += `📦 ${p.pedir} x ${String(p.nombre).substring(0,25)}\n`;
     });
 
-    const htmlTk = `<html><head><title>${e}</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><style>body{font-family:'Courier New',monospace;font-size:12px;margin:0;padding:10px;}h2,p{margin:2px 0;text-align:center;}table{width:100%;border-collapse:collapse;margin-top:10px;}th{border-bottom:1px dashed black;text-align:left;font-size:11px;}</style></head><body>
-        <h2>${e}</h2>
-        <p style="font-weight:bold; font-size:14px; margin: 4px 0;">ORDEN DE COMPRA</p>
-        <p>Sucursal: ${z}</p>
-        <p>Fecha: ${f}</p>
-        <p>Usuario: ${u}</p>
-        <table>
-            <thead><tr><th>SKU</th><th>Prod</th><th>Prov</th><th style="text-align:center;">Pedir</th><th style="text-align:right;">Costo</th><th style="text-align:right;">Sub</th></tr></thead>
-            <tbody>${tkF}</tbody>
-        </table>
-        <h3 style="text-align:right; margin-top:10px;">TOTAL EST.: $${totalCosto.toFixed(2)}</h3>
-        <p style="margin-top:20px; border-top:1px dashed black; padding-top:5px; text-align:center;">Firma de Autorización</p>
-        </body></html>`;
+    // Agregamos el total
+    textoMensaje += `\n💰 *Total Estimado:* $${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}\n\n_Generado desde BOOMBOX_`;
 
-    let ifr = document.getElementById('iframeImpresion');
-    if(!ifr) {
-        ifr = document.createElement('iframe');
-        ifr.id = 'iframeImpresion';
-        ifr.style.display = 'none';
-        document.body.appendChild(ifr);
-    }
+    // Convertimos el texto a formato de URL para WhatsApp
+    const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoMensaje)}`;
 
-    ifr.contentWindow.document.open();
-    ifr.contentWindow.document.write(htmlTk);
-    ifr.contentWindow.document.close();
+    // Abrimos WhatsApp (en celular abrirá la app, en PC abrirá WhatsApp Web)
+    window.open(urlWhatsApp, '_blank');
 
-    setTimeout(() => {
-        ifr.contentWindow.focus();
-        ifr.contentWindow.print();
-        window.cerrarModalOrden();
-        window.mostrarNotificacion("🖨️ Orden enviada a imprimir");
-    }, 500);
+    // Cerramos la ventana y mandamos notificación
+    window.cerrarModalOrden();
+    window.mostrarNotificacion("📲 Abriendo WhatsApp...");
 };
 
 window.guardarProveedor = async () => {
