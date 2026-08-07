@@ -516,7 +516,7 @@ function limpiarYTerminarVenta(btn) {
     btn.innerText = "✅ Cobrar e Imprimir"; 
 }
 
-// 8. ALERTAS, ÓRDENES DE COMPRA Y PROVEEDORES
+// 8. ALERTAS Y ÓRDENES DE COMPRA (BLINDADO CON WHATSAPP)
 window.renderAgotados = () => {
     const tb = document.getElementById('tablaAgotadosBody');
     const filtroTipo = document.getElementById('alerta_filtro_tipo').value;
@@ -563,7 +563,6 @@ window.renderAgotados = () => {
     tb.innerHTML = h || "<tr><td colspan='4' class='p-8 text-center font-bold text-green-600'>✅ Todo en orden. Sin alertas actuales.</td></tr>";
 };
 
-// --- MÓDULO EDITABLE DE ÓRDENES DE COMPRA ---
 window.generarOrdenCompra = () => {
     let faltantes = window.inventarioLocal.filter(p => p.stock <= (p.min_stk || 0));
     
@@ -571,7 +570,6 @@ window.generarOrdenCompra = () => {
         return alert("✅ Todo el inventario está por encima del mínimo. No se requiere orden de compra.");
     }
 
-    // BLINDAJE: Evita que productos guardados por error sin nombre traben el sistema
     faltantes.sort((a,b) => {
         let provA = String(a.proveedor || "Z_Sin Proveedor");
         let provB = String(b.proveedor || "Z_Sin Proveedor");
@@ -627,40 +625,34 @@ window.cerrarModalOrden = () => {
     document.getElementById('modalOrdenCompra').classList.add('hidden');
 };
 
+// NUEVA FUNCIÓN PARA ENVIAR POR WHATSAPP INTEGRADA SIN CORTOS DE CÓDIGO
 window.enviarOrdenWhatsApp = () => {
     const e = localStorage.getItem('empresaId'); 
     const z = document.getElementById('zonaSelect').value;
     
-    // Filtramos solo los productos que tengan un número mayor a 0 en la caja azul
     let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); 
 
     if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada. Modifica las celdas de 'Cant. a Pedir'.");
 
-    // Armamos el encabezado del mensaje
     let textoMensaje = `📋 *NUEVA ORDEN DE COMPRA*\n🏢 *Negocio:* ${e}\n📍 *Sucursal:* ${z}\n\n*Productos solicitados:*\n`;
     let totalCosto = 0;
 
-    // Agregamos cada producto editado a la lista
     filterPedir.forEach(p => {
         let subCosto = (parseFloat(p.costo) || 0) * p.pedir;
         totalCosto += subCosto;
         textoMensaje += `📦 ${p.pedir} x ${String(p.nombre).substring(0,25)}\n`;
     });
 
-    // Agregamos el total
     textoMensaje += `\n💰 *Total Estimado:* $${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}\n\n_Generado desde BOOMBOX_`;
 
-    // Convertimos el texto a formato de URL para WhatsApp
     const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoMensaje)}`;
-
-    // Abrimos WhatsApp (en celular abrirá la app, en PC abrirá WhatsApp Web)
     window.open(urlWhatsApp, '_blank');
 
-    // Cerramos la ventana y mandamos notificación
     window.cerrarModalOrden();
     window.mostrarNotificacion("📲 Abriendo WhatsApp...");
 };
-
+window.imprimirOrdenCompra = window.enviarOrdenWhatsApp;
+// 9. PROVEEDORES
 window.guardarProveedor = async () => {
     const nom = document.getElementById('prov_nombre').value.trim();
     const tel = document.getElementById('prov_tel').value.trim();
@@ -708,10 +700,10 @@ window.cargarProveedores = async () => {
 window.eliminarProveedor = async (id) => {
     if(!confirm("¿Borrar este proveedor?")) return;
     const e = localStorage.getItem('empresaId');
-    try { await deleteDoc(doc(db, `${e}_Proveedores`, id)); window.cargarProveedores(); } catch(er) { alert("Error."); }
+    try { deleteDoc(doc(db, `${e}_Proveedores`, id)); window.cargarProveedores(); } catch(er) { alert("Error."); }
 };
 
-// 9. EDICIÓN, REGISTRO Y CARGA MASIVA
+// 10. EDICIÓN, REGISTRO Y CARGA MASIVA
 window.guardarProducto = async () => {
     const sku = document.getElementById('p_sku').value.trim(); 
     const nom = document.getElementById('p_nom').value.trim(); 
@@ -870,7 +862,7 @@ window.vaciarInventario = async () => {
     } catch(e) { alert("Error al borrar inventario."); } 
 };
 
-// 10. REPORTES Y KARDEX
+// 11. REPORTES Y KARDEX
 window.generarReporte = async () => {
     const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); 
     const fIniStr = document.getElementById('rep_inicio').value; const fFinStr = document.getElementById('rep_fin').value; const fCat = document.getElementById('rep_cat').value;
@@ -958,7 +950,7 @@ window.cargarKardex = async (tipo = 'entradas') => {
     } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error al consultar Kardex</td></tr>`; }
 };
 
-// 11. USUARIOS Y ZONAS
+// 12. USUARIOS Y ZONAS
 window.crearUsuarioSecundario = async () => { 
     const u = document.getElementById('new_user').value.trim(); 
     const em = document.getElementById('new_email').value.trim().toLowerCase(); 
@@ -982,6 +974,7 @@ window.crearUsuarioSecundario = async () => {
         window.cargarUsuarios(); 
     } catch(er) { alert("Error al crear usuario: " + er.message); } 
 };
+
 window.cargarUsuarios = async () => { 
     const e = localStorage.getItem('empresaId'); 
     const tb = document.getElementById('tablaUsuariosBody'); 
@@ -1016,7 +1009,7 @@ window.agregarNuevaZona = async () => {
     } 
 };
 
-// 12. INICIO AUTOMÁTICO
+// 13. INICIO AUTOMÁTICO
 if(localStorage.getItem('currentUser')) {
     iniciarApp();
 }
