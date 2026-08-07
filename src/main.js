@@ -48,10 +48,11 @@ window.cambiarPestaña = (idTab) => {
         btn.classList.remove('tab-active', 'border-b-4', 'border-orange-500', 'text-orange-600');
         btn.classList.add('text-gray-600');
     });
-    document.getElementById(idTab).classList.remove('hidden'); 
-    const activeBtn = document.getElementById('btn-' + idTab);
     
-    // Si el botón existe, actualiza sus colores
+    const wrapper = document.getElementById(idTab);
+    if(wrapper) wrapper.classList.remove('hidden'); 
+    
+    const activeBtn = document.getElementById('btn-' + idTab);
     if(activeBtn) {
         activeBtn.classList.add('tab-active', 'border-b-4', 'border-orange-500', 'text-orange-600');
         activeBtn.classList.remove('text-gray-600');
@@ -181,7 +182,10 @@ function iniciarApp() {
         zs.forEach(z => sZ.add(new Option(z, z)));
 
         if (r === 'Dueño' || r === 'Gerente') {
-            ['btn-tab-registro','btn-tab-kardex','btn-tab-reportes','btn-tab-agotados','btn-tab-proveedores','btnAgregarZona'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+            ['btn-tab-registro','btn-tab-kardex','btn-tab-reportes','btn-tab-agotados','btn-tab-proveedores','btnAgregarZona'].forEach(id => {
+                const btnRef = document.getElementById(id);
+                if(btnRef) btnRef.classList.remove('hidden');
+            });
             document.querySelectorAll('.costo-col').forEach(el => el.classList.remove('hidden')); 
             document.querySelectorAll('.accion-col').forEach(el => el.classList.remove('hidden'));
         } else { 
@@ -378,7 +382,7 @@ window.agregarAlCarrito = (p) => {
     
     const ex = window.carrito.find(i => i.sku === p.sku);
     if (ex) { 
-        if(ex.cantidad < p.stock) { 
+        if(ex.whitespace || ex.cantidad < p.stock) { 
             ex.cantidad++; 
             ex.precioVentaReal = window.calcularPrecioExacto(ex, ex.cantidad); 
         } else { 
@@ -520,8 +524,7 @@ function limpiarYTerminarVenta(btn) {
     btn.innerText = "✅ Cobrar e Imprimir"; 
 }
 
-
-// 8. ALERTAS Y ÓRDENES DE COMPRA (MODO PESTAÑA BLOC DE NOTAS)
+// 8. ALERTAS Y ÓRDENES DE COMPRA (MODO PESTAÑA CON TARJETAS ACCESIBLES)
 window.renderAgotados = () => {
     const tb = document.getElementById('tablaAgotadosBody');
     const filtroTipo = document.getElementById('alerta_filtro_tipo').value;
@@ -556,19 +559,18 @@ window.renderAgotados = () => {
     let h = "";
     alertas.forEach(p => {
         const s = p.stock % 1 !== 0 ? p.stock.toFixed(3) : p.stock;
-        let ganStr = p.gananciaNum > 0 ? `<span class="text-green-600 font-bold">+$${p.gananciaNum.toFixed(2)}</span>` : `<span class="text-gray-400">N/A</span>`;
         let provStr = p.proveedor ? `<span class="text-[10px] text-teal-600 font-bold block mt-1">🚚 ${p.proveedor}</span>` : '';
         h += `<tr class="border-b bg-white hover:bg-red-50 transition">
             <td class="p-3"><span class="font-mono text-gray-500 text-xs block">${p.sku}</span><span class="font-bold">${p.nombre}</span><span class="text-xs text-gray-400 block">${p.categoria||''}</span>${provStr}</td>
             <td class="p-3 text-center"><span class="font-black text-lg text-red-600">${s}</span> <span class="text-gray-400 text-xs block mt-1">Límite: ${p.min_stk||0}</span></td>
             <td class="p-3">${p.estadoHTML}</td>
-            <td class="p-3 text-right bg-green-50/50">${ganStr}</td>
+            <td class="p-3 text-right bg-green-50/50">${p.gananciaNum > 0 ? `+$${p.gananciaNum.toFixed(2)}` : 'N/A'}</td>
         </tr>`;
     });
     tb.innerHTML = h || "<tr><td colspan='4' class='p-8 text-center font-bold text-green-600'>✅ Todo en orden. Sin alertas actuales.</td></tr>";
 };
 
-// --- MÓDULO ÓRDENES DE COMPRA (PESTAÑA) ---
+// --- MÓDULO ÓRDENES DE COMPRA (PESTAÑA CON CONTROL VISUAL) ---
 window.generarOrdenCompra = () => {
     let faltantes = window.inventarioLocal.filter(p => parseFloat(p.stock) <= (parseFloat(p.min_stk) || 0));
     
@@ -590,41 +592,70 @@ window.generarOrdenCompra = () => {
         return { ...p, pedir: sugerido };
     });
 
-    // Te teletransporta a la pestaña nueva
     window.cambiarPestaña('tab-orden');
     window.renderTabOrdenCompra();
 };
 
 window.renderTabOrdenCompra = () => {
-    const tb = document.getElementById('tablaOrdenTabBody');
-    if(!tb) return;
+    const contenedor = document.getElementById('contenedorTarjetasOrden');
+    if(!contenedor) return;
     
     let h = "";
     let totalCosto = 0;
+
+    if (window.ordenCompraActual.length === 0) {
+        contenedor.innerHTML = `<div class="bg-white p-8 rounded-2xl text-center text-gray-400 font-bold border-2 border-dashed">No hay productos en la lista</div>`;
+        return;
+    }
 
     window.ordenCompraActual.forEach((p, idx) => {
         let subCosto = (parseFloat(p.costo) || 0) * (parseFloat(p.pedir) || 0);
         totalCosto += subCosto;
         
-        h += `<tr class="border-b hover:bg-gray-50">
-            <td class="p-3 text-sm font-bold"><span class="block text-xs text-teal-700 font-normal">${p.proveedor || 'Sin prov.'}</span>${p.nombre}</td>
-            <td class="p-3 text-center font-bold text-red-500">${p.stock}</td>
-            <td class="p-3 text-center bg-blue-50">
-                <input type="number" min="0" step="${p.es_granel ? 'any' : '1'}" class="w-16 md:w-20 p-2 border-2 border-blue-300 rounded text-center font-bold focus:ring-2 focus:ring-blue-500" value="${p.pedir}" onchange="window.actualizarCantOrden(${idx}, this.value)">
-            </td>
-            <td class="p-3 text-right font-bold text-orange-600">$${subCosto.toFixed(2)}</td>
-        </tr>`;
+        const stockActualStr = p.stock % 1 !== 0 ? parseFloat(p.stock).toFixed(2) : p.stock;
+        const provStr = p.proveedor ? `🚚 ${p.proveedor}` : '📁 Sin Proveedor Asignado';
+
+        h += `
+        <div class="bg-white p-4 rounded-2xl shadow-sm border-2 border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div class="flex-1">
+                <span class="text-[11px] font-extrabold uppercase tracking-wide text-teal-600 bg-teal-50 px-2 py-0.5 rounded-md mb-1 inline-block">${provStr}</span>
+                <h3 class="text-lg font-black text-gray-800 leading-tight">${p.nombre}</h3>
+                <div class="flex gap-4 mt-1 text-xs text-gray-500 font-bold">
+                    <span>Stock actual: <strong class="text-red-500">${stockActualStr}</strong></span>
+                    <span>Costo: <strong>$${(parseFloat(p.costo)||0).toFixed(2)}</strong></span>
+                </div>
+            </div>
+            <div class="flex items-center justify-between w-full sm:w-auto gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                <div class="flex items-center bg-gray-100 p-1.5 rounded-xl border border-gray-200">
+                    <button onclick="window.modificarCantidadBoton(${idx}, -1)" class="w-10 h-10 bg-white hover:bg-red-50 text-red-600 rounded-lg font-black text-xl shadow-sm flex items-center justify-center transition active:scale-90 select-none">
+                        −
+                    </button>
+                    <span class="w-12 text-center font-black text-xl text-gray-800 select-none">
+                        ${p.pedir}
+                    </span>
+                    <button onclick="window.modificarCantidadBoton(${idx}, 1)" class="w-10 h-10 bg-white hover:bg-emerald-50 text-emerald-600 rounded-lg font-black text-xl shadow-sm flex items-center justify-center transition active:scale-90 select-none">
+                        +
+                    </button>
+                </div>
+                <div class="text-right min-w-[80px]">
+                    <span class="text-[10px] block text-gray-400 font-bold uppercase">Subtotal</span>
+                    <span class="text-base font-black text-orange-600">$${subCosto.toFixed(2)}</span>
+                </div>
+            </div>
+        </div>`;
     });
 
-    tb.innerHTML = h;
+    contenedor.innerHTML = h;
     document.getElementById('totalOrdenTab').innerText = `$${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
 };
 
-window.actualizarCantOrden = (idx, val) => {
-    let v = parseFloat(val) || 0;
-    if(v < 0) v = 0;
-    window.ordenCompraActual[idx].pedir = v;
-    window.renderTabOrdenCompra();
+window.modificarCantidadBoton = (idx, cambio) => {
+    let actual = parseFloat(window.ordenCompraActual[idx].pedir) || 0;
+    let nuevo = actual + cambio;
+    if (nuevo < 0) nuevo = 0; 
+    
+    window.ordenCompraActual[idx].pedir = nuevo;
+    window.renderTabOrdenCompra(); 
 };
 
 window.enviarOrdenWhatsApp = () => {
@@ -633,7 +664,7 @@ window.enviarOrdenWhatsApp = () => {
     
     let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); 
 
-    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada. Modifica las celdas azules de 'A Pedir'.");
+    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada. Modifica las celdas de 'A Pedir'.");
 
     let textoMensaje = `📋 *NUEVA ORDEN DE COMPRA*\n🏢 *Negocio:* ${e}\n📍 *Sucursal:* ${z}\n\n*Productos solicitados:*\n`;
     let totalCosto = 0;
@@ -648,7 +679,6 @@ window.enviarOrdenWhatsApp = () => {
 
     const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoMensaje)}`;
     window.open(urlWhatsApp, '_blank');
-
     window.mostrarNotificacion("📲 Abriendo WhatsApp...");
 };
 
@@ -684,7 +714,7 @@ window.cargarProveedores = async () => {
         sn.forEach(d => {
             const pr = d.data();
             const diasStr = pr.dias.length > 0 ? pr.dias.join(', ') : 'Llamada previa';
-            h += `<tr class="border-b"><td class="p-3"><span class="font-bold text-teal-700 block">${pr.nombre}</span><span class="text-xs text-gray-500">📞 ${pr.telefono||'Sin Tel'}</span></td><td class="p-3 text-sm font-bold">${diasStr}</td><td class="p-3 text-xs text-gray-600 whitespace-pre-wrap">${pr.notas}</td><td class="p-3"><button onclick="eliminarProveedor('${pr.id}')" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded transition">🗑️</button></td></tr>`;
+            h += `<tr class="border-b"><td class="p-3"><span class="font-bold text-teal-700 block">${pr.nombre}</span><span class="text-xs text-gray-500">📞 ${pr.telefono||'Sin Tel'}</span></td><td class="p-3 text-sm font-bold">${diasStr}</td><td class="p-3 text-xs text-gray-600 whitespace-pre-wrap">${pr.notes || pr.notas}</td><td class="p-3"><button onclick="eliminarProveedor('${pr.id}')" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded transition">🗑️</button></td></tr>`;
             opts += `<option value="${pr.nombre}">${pr.nombre}</option>`;
         }); 
         tb.innerHTML = h || "<tr><td colspan='4' class='text-center p-8'>Sin proveedores registrados</td></tr>";
