@@ -50,8 +50,12 @@ window.cambiarPestaña = (idTab) => {
     });
     document.getElementById(idTab).classList.remove('hidden'); 
     const activeBtn = document.getElementById('btn-' + idTab);
-    activeBtn.classList.add('tab-active', 'border-b-4', 'border-orange-500', 'text-orange-600');
-    activeBtn.classList.remove('text-gray-600');
+    
+    // Si el botón existe, actualiza sus colores
+    if(activeBtn) {
+        activeBtn.classList.add('tab-active', 'border-b-4', 'border-orange-500', 'text-orange-600');
+        activeBtn.classList.remove('text-gray-600');
+    }
     
     window.detenerCamara('ventas'); window.detenerCamara('ingreso');
     
@@ -195,7 +199,7 @@ function iniciarApp() {
     } catch (err) { window.cerrarSesion(); }
 }
 
-// 5. CÁMARA E INTEGRACIÓN DE REGISTRO RÁPIDO
+// 5. CÁMARA
 let scanners = { ventas: null, ingreso: null };
 window.iniciarCamara = (m) => { 
     document.getElementById(`reader-${m}`).classList.remove('hidden'); 
@@ -516,7 +520,8 @@ function limpiarYTerminarVenta(btn) {
     btn.innerText = "✅ Cobrar e Imprimir"; 
 }
 
-// 8. ALERTAS Y ÓRDENES DE COMPRA (BLINDADO CON WHATSAPP)
+
+// 8. ALERTAS Y ÓRDENES DE COMPRA (MODO PESTAÑA BLOC DE NOTAS)
 window.renderAgotados = () => {
     const tb = document.getElementById('tablaAgotadosBody');
     const filtroTipo = document.getElementById('alerta_filtro_tipo').value;
@@ -563,8 +568,9 @@ window.renderAgotados = () => {
     tb.innerHTML = h || "<tr><td colspan='4' class='p-8 text-center font-bold text-green-600'>✅ Todo en orden. Sin alertas actuales.</td></tr>";
 };
 
+// --- MÓDULO ÓRDENES DE COMPRA (PESTAÑA) ---
 window.generarOrdenCompra = () => {
-    let faltantes = window.inventarioLocal.filter(p => p.stock <= (p.min_stk || 0));
+    let faltantes = window.inventarioLocal.filter(p => parseFloat(p.stock) <= (parseFloat(p.min_stk) || 0));
     
     if(faltantes.length === 0) {
         return alert("✅ Todo el inventario está por encima del mínimo. No se requiere orden de compra.");
@@ -579,60 +585,55 @@ window.generarOrdenCompra = () => {
     });
 
     window.ordenCompraActual = faltantes.map(p => {
-        let sugerido = (p.max_stk || 0) > 0 ? (p.max_stk - p.stock) : 1; 
+        let sugerido = (parseFloat(p.max_stk) || 0) > 0 ? (parseFloat(p.max_stk) - parseFloat(p.stock)) : 1; 
         if (sugerido < 0) sugerido = 0;
         return { ...p, pedir: sugerido };
     });
 
-    window.renderModalOrdenCompra();
-    document.getElementById('modalOrdenCompra').classList.remove('hidden');
+    // Te teletransporta a la pestaña nueva
+    window.cambiarPestaña('tab-orden');
+    window.renderTabOrdenCompra();
 };
 
-window.renderModalOrdenCompra = () => {
-    const tb = document.getElementById('tablaOrdenCompraBody');
+window.renderTabOrdenCompra = () => {
+    const tb = document.getElementById('tablaOrdenTabBody');
+    if(!tb) return;
+    
     let h = "";
     let totalCosto = 0;
 
     window.ordenCompraActual.forEach((p, idx) => {
-        let subCosto = (p.costo || 0) * (p.pedir || 0);
+        let subCosto = (parseFloat(p.costo) || 0) * (parseFloat(p.pedir) || 0);
         totalCosto += subCosto;
         
         h += `<tr class="border-b hover:bg-gray-50">
-            <td class="p-3 text-xs font-mono text-gray-500">${p.sku}</td>
-            <td class="p-3 text-sm font-bold truncate max-w-[200px]">${p.nombre}</td>
-            <td class="p-3 text-xs text-teal-700">${p.proveedor || '--'}</td>
+            <td class="p-3 text-sm font-bold"><span class="block text-xs text-teal-700 font-normal">${p.proveedor || 'Sin prov.'}</span>${p.nombre}</td>
             <td class="p-3 text-center font-bold text-red-500">${p.stock}</td>
-            <td class="p-3 text-right text-gray-600">$${(p.costo || 0).toFixed(2)}</td>
             <td class="p-3 text-center bg-blue-50">
-                <input type="number" min="0" step="${p.es_granel ? 'any' : '1'}" class="w-20 p-2 border-2 rounded text-center font-bold focus:ring-2 focus:ring-blue-500" value="${p.pedir}" onchange="window.actualizarCantOrden(${idx}, this.value)">
+                <input type="number" min="0" step="${p.es_granel ? 'any' : '1'}" class="w-16 md:w-20 p-2 border-2 border-blue-300 rounded text-center font-bold focus:ring-2 focus:ring-blue-500" value="${p.pedir}" onchange="window.actualizarCantOrden(${idx}, this.value)">
             </td>
             <td class="p-3 text-right font-bold text-orange-600">$${subCosto.toFixed(2)}</td>
         </tr>`;
     });
 
     tb.innerHTML = h;
-    document.getElementById('totalOrdenCompra').innerText = `$${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+    document.getElementById('totalOrdenTab').innerText = `$${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
 };
 
 window.actualizarCantOrden = (idx, val) => {
     let v = parseFloat(val) || 0;
     if(v < 0) v = 0;
     window.ordenCompraActual[idx].pedir = v;
-    window.renderModalOrdenCompra();
+    window.renderTabOrdenCompra();
 };
 
-window.cerrarModalOrden = () => {
-    document.getElementById('modalOrdenCompra').classList.add('hidden');
-};
-
-// NUEVA FUNCIÓN PARA ENVIAR POR WHATSAPP INTEGRADA SIN CORTOS DE CÓDIGO
 window.enviarOrdenWhatsApp = () => {
     const e = localStorage.getItem('empresaId'); 
     const z = document.getElementById('zonaSelect').value;
     
     let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); 
 
-    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada. Modifica las celdas de 'Cant. a Pedir'.");
+    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir configurada. Modifica las celdas azules de 'A Pedir'.");
 
     let textoMensaje = `📋 *NUEVA ORDEN DE COMPRA*\n🏢 *Negocio:* ${e}\n📍 *Sucursal:* ${z}\n\n*Productos solicitados:*\n`;
     let totalCosto = 0;
@@ -648,10 +649,9 @@ window.enviarOrdenWhatsApp = () => {
     const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoMensaje)}`;
     window.open(urlWhatsApp, '_blank');
 
-    window.cerrarModalOrden();
     window.mostrarNotificacion("📲 Abriendo WhatsApp...");
 };
-window.imprimirOrdenCompra = window.enviarOrdenWhatsApp;
+
 // 9. PROVEEDORES
 window.guardarProveedor = async () => {
     const nom = document.getElementById('prov_nombre').value.trim();
@@ -700,7 +700,7 @@ window.cargarProveedores = async () => {
 window.eliminarProveedor = async (id) => {
     if(!confirm("¿Borrar este proveedor?")) return;
     const e = localStorage.getItem('empresaId');
-    try { deleteDoc(doc(db, `${e}_Proveedores`, id)); window.cargarProveedores(); } catch(er) { alert("Error."); }
+    try { await deleteDoc(doc(db, `${e}_Proveedores`, id)); window.cargarProveedores(); } catch(er) { alert("Error."); }
 };
 
 // 10. EDICIÓN, REGISTRO Y CARGA MASIVA
