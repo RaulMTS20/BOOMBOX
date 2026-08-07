@@ -9,524 +9,103 @@
     <style>
         .animate-fade-in { animation: fadeIn 0.2s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        .toast { position: fixed; bottom: 20px; right: 20px; bg-color: #333; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; animation: fadeIn 0.2s ease-out; font-weight: bold; background: #1f2937; border-left: 4px solid #f97316; }
-        @media screen and (max-width: 768px) {
-            table { font-size: 11px !important; }
-            th, td { padding: 6px 4px !important; white-space: normal !important; word-wrap: break-word; }
-            .table-responsive, div[style*="overflow-x: auto"] { width: 100%; display: block; -webkit-overflow-scrolling: touch; }
-            .nav-tabs button, .tab-button { padding: 8px 10px; font-size: 12px; }
-        }
+        .toast { position: fixed; bottom: 20px; right: 20px; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; font-weight: bold; background: #1f2937; border-left: 4px solid #f97316; }
     </style>
 </head>
 <body class="bg-gray-50 font-sans antialiased min-h-screen">
-
     <div id="toast-container" class="fixed bottom-5 right-5 z-50 space-y-2"></div>
 
     <div id="authScreen" class="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-orange-500 to-amber-600">
         <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
             <div class="text-center mb-6">
                 <h1 class="text-3xl font-black text-orange-600 tracking-tight">💥 BOOMBOX</h1>
-                <p class="text-gray-500 text-sm mt-1">Control de Inventario Inteligente</p>
             </div>
-
             <div id="loginForm" class="space-y-4">
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Usuario</label>
-                    <input type="text" id="loginUser" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition font-medium" placeholder="Ej. mi_tiendita">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Contraseña</label>
-                    <input type="password" id="loginPass" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="••••••••">
-                </div>
-                <button id="btnLogin" onclick="iniciarSesion()" class="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg transition transform active:scale-95">
-                    Entrar al Sistema
-                </button>
-                <div class="text-center pt-2 space-y-2">
-                    <button onclick="recuperarPassword()" class="text-xs font-bold text-orange-600 hover:underline block mx-auto">¿Olvidaste tu contraseña?</button>
-                    <button onclick="toggleAuth()" class="text-xs font-medium text-gray-500 hover:text-gray-700 block mx-auto">¿Eres nuevo? <strong class="text-orange-600">Registrar un negocio</strong></button>
-                </div>
-            </div>
-
-            <div id="registerForm" class="space-y-4 hidden">
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nombre del Negocio</label>
-                    <input type="text" id="regEmpresa" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Ej. Abarrotes La Principal">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Primera Sucursal / Zona</label>
-                    <input type="text" id="regZona" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Ej. Centro">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Usuario Administrador</label>
-                    <input type="text" id="regUser" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Ej. admin_tienda">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Correo Electrónico</label>
-                    <input type="email" id="regEmail" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="correo@negocio.com">
-                </div>
-                <div>
-                    <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Contraseña Segura</label>
-                    <input type="password" id="regPass" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="Mínimo 6 caracteres">
-                </div>
-                <button id="btnRegister" onclick="registrarNegocio()" class="w-full py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-lg transition">
-                    Crear Cuenta Principal
-                </button>
-                <button onclick="toggleAuth()" class="w-full text-xs font-bold text-gray-500 hover:text-gray-700 text-center block">Regresar al inicio de sesión</button>
+                <input type="text" id="loginUser" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Usuario">
+                <input type="password" id="loginPass" class="w-full p-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Contraseña">
+                <button id="btnLogin" onclick="iniciarSesion()" class="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-lg transition">Entrar</button>
             </div>
         </div>
     </div>
 
     <div id="appScreen" class="hidden min-h-screen flex flex-col">
-        <header class="bg-white border-b shadow-sm sticky top-0 z-40 p-3 md:p-4 flex justify-between items-center">
+        <header class="bg-white border-b shadow-sm sticky top-0 z-40 p-3 flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <span class="text-xl md:text-2xl font-black text-orange-600">💥 <span id="displayEmpresa">Negocio</span></span>
-                <select id="zonaSelect" onchange="alCambiarZona()" class="p-2 border-2 bg-gray-50 rounded-xl font-bold text-xs md:text-sm text-gray-700 focus:ring-2 focus:ring-orange-500 outline-none"></select>
-                <button id="btnAgregarZona" onclick="agregarNuevaZona()" class="hidden p-2 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition">+ Nueva Zona</button>
+                <span class="text-xl font-black text-orange-600">💥 <span id="displayEmpresa">Negocio</span></span>
+                <select id="zonaSelect" onchange="alCambiarZona()" class="p-2 border-2 bg-gray-50 rounded-xl font-bold text-xs outline-none"></select>
             </div>
-            <div class="flex items-center gap-4">
-                <span id="displayUser" class="text-xs md:text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">--</span>
-                <button onclick="cerrarSesion()" class="text-xs font-bold text-red-600 hover:underline">Cerrar Sesión</button>
-            </div>
+            <button onclick="cerrarSesion()" class="text-xs font-bold text-red-600">Cerrar Sesión</button>
         </header>
 
-        <nav class="bg-white border-b overflow-x-auto flex whitespace-nowrap sticky top-[61px] md:top-[73px] z-30 shadow-sm nav-tabs">
+        <nav class="bg-white border-b overflow-x-auto flex whitespace-nowrap sticky top-[61px] z-30 shadow-sm nav-tabs">
             <button id="btn-tab-ventas" onclick="cambiarPestaña('tab-ventas')" class="tab-button px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">🛒 Ventas</button>
             <button id="btn-tab-general" onclick="cambiarPestaña('tab-general')" class="tab-button px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📦 Inventario</button>
-            <button id="btn-tab-registro" onclick="cambiarPestaña('tab-registro')" class="tab-button hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📥 Bodega</button>
             <button id="btn-tab-agotados" onclick="cambiarPestaña('tab-agotados')" class="tab-button hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">⚠️ Alertas Stock</button>
-            <button id="btn-tab-proveedores" onclick="cambiarPestaña('tab-proveedores')" class="tab-button hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">🚚 Proveedores</button>
-            <button id="btn-tab-kardex" onclick="cambiarPestaña('tab-kardex')" class="tab-button hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📋 Kardex</button>
-            <button id="btn-tab-reportes" onclick="cambiarPestaña('tab-reportes')" class="tab-button hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📈 Reportes</button>
-            <button id="btn-tab-usuarios" onclick="cambiarPestaña('tab-usuarios')" class="tab-button hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">👥 Equipo</button>
+            <button id="btn-tab-orden" onclick="cambiarPestaña('tab-orden')" class="tab-button hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📝 Lista de Pedido</button>
         </nav>
 
         <main class="flex-1 p-2 md:p-4 max-w-7xl w-full mx-auto">
-            
             <div id="tab-ventas" class="tab-content hidden space-y-4 animate-fade-in">
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div class="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm space-y-4 border">
-                        <div class="relative">
-                            <input type="text" id="venta_busqueda" oninput="filtrarProductosVenta()" class="w-full p-4 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 outline-none text-base font-bold" placeholder="Busca por Nombre o Código de barras...">
-                            <div id="sugerencias_venta" class="absolute left-0 right-0 top-full bg-white border-2 rounded-xl mt-1 max-h-60 overflow-y-auto shadow-2xl z-50 hidden"></div>
-                        </div>
-                        <div class="flex flex-col gap-2">
-                            <button id="btn-iniciar-camara-ventas" onclick="iniciarCamara('ventas')" class="w-full py-3 bg-gray-800 hover:bg-gray-900 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition">📷 Encender Cámara Escáner</button>
-                            <button id="btn-detener-camara-ventas" onclick="detenerCamara('ventas')" class="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition hidden">❌ Apagar Cámara</button>
-                            <div id="reader-ventas" class="w-full max-w-sm mx-auto rounded-xl overflow-hidden hidden"></div>
-                        </div>
+                    <div class="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm border space-y-4">
+                        <input type="text" id="venta_busqueda" oninput="filtrarProductosVenta()" class="w-full p-4 border-2 rounded-xl" placeholder="Busca por Nombre o Código...">
+                        <div id="sugerencias_venta" class="bg-white border-2 rounded-xl mt-1 max-h-60 overflow-y-auto hidden"></div>
+                        <button onclick="iniciarCamara('ventas')" class="w-full py-3 bg-gray-800 text-white font-bold rounded-xl">📷 Encender Escáner</button>
+                        <div id="reader-ventas" class="hidden"></div>
                     </div>
                     <div class="bg-white p-4 rounded-2xl shadow-sm border flex flex-col h-fit space-y-4">
-                        <h2 class="text-lg font-black text-gray-800 border-b pb-2 flex items-center gap-2">🛒 Lista de Cobro</h2>
-                        <div class="overflow-y-auto max-h-72 flex-1">
-                            <table class="w-full text-left">
-                                <tbody id="tabla-carrito">
-                                    <tr><td colspan="4" class="text-center text-gray-400 py-8">El carrito está vacío</td></tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="border-t pt-4 space-y-3">
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-gray-500 uppercase tracking-wider text-xs">Total a Cobrar:</span>
-                                <span id="gran-total" class="text-3xl font-black text-green-600">$0.00</span>
-                            </div>
-                            <label class="flex items-center gap-2 bg-gray-50 p-3 rounded-xl border cursor-pointer">
-                                <input type="checkbox" id="chk_imprimir" class="w-5 h-5 accent-orange-500" checked>
-                                <span class="text-xs font-bold text-gray-700">🖨️ Imprimir ticket al cobrar</span>
-                            </label>
-                            <button id="btn-cobrar" onclick="procesarVentaCompleta()" class="w-full py-4 bg-green-600 hover:bg-green-700 text-white text-lg font-black rounded-xl shadow-xl transition transform active:scale-95">✅ Terminar y Cobrar Venta</button>
+                        <h2 class="text-lg font-black border-b pb-2">🛒 Lista de Cobro</h2>
+                        <table class="w-full text-left"><tbody id="tabla-carrito"></tbody></table>
+                        <div class="border-t pt-4">
+                            <span id="gran-total" class="text-3xl font-black text-green-600 block text-right">$0.00</span>
+                            <button id="btn-cobrar" onclick="procesarVentaCompleta()" class="w-full mt-4 py-4 bg-green-600 text-white text-lg font-black rounded-xl">Cobrar Venta</button>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div id="tab-general" class="tab-content hidden space-y-4 animate-fade-in">
-                <div class="bg-white p-4 rounded-2xl shadow-sm border space-y-4">
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                        <input type="text" id="filtro_inv_txt" oninput="renderInventarioPantalla()" class="p-3 border-2 rounded-xl text-sm font-bold focus:ring-2 focus:ring-orange-500 outline-none" placeholder="🔍 Buscar por nombre/SKU...">
-                        <select id="filtro_inv_cat" onchange="renderInventarioPantalla()" class="p-3 border-2 rounded-xl text-sm font-bold bg-gray-50 text-gray-700"></select>
-                        <select id="filtro_inv_ord" onchange="renderInventarioPantalla()" class="p-3 border-2 rounded-xl text-sm font-bold bg-gray-50 text-gray-700">
-                            <option value="nombre">Ordenar: A-Z</option>
-                            <option value="stock_asc">Menor Stock primero</option>
-                            <option value="stock_desc">Mayor Stock primero</option>
-                        </select>
-                        <button id="btnVaciarInventario" onclick="vaciarInventario()" class="hidden py-3 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl transition border border-red-200">⚠️ Vaciar Zona</button>
-                    </div>
-                    <div class="overflow-x-auto rounded-xl border border-gray-100">
-                        <table class="w-full border-collapse text-left text-sm">
-                            <thead>
-                                <tr class="bg-gray-800 text-white">
-                                    <th class="p-3 hidden">SKU</th>
-                                    <th class="p-3">Producto</th>
-                                    <th class="p-3">Categoría/Prov</th>
-                                    <th class="p-3 text-center">Stock</th>
-                                    <th class="p-3 text-left costo-col hidden">Costo</th>
-                                    <th class="p-3 text-left">Precio</th>
-                                    <th class="p-3 text-center accion-col hidden">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaInventarioGeneralBody"></tbody>
-                        </table>
-                    </div>
+            <div id="tab-general" class="tab-content hidden animate-fade-in">
+                <div class="bg-white p-4 rounded-2xl border">
+                    <h2 class="text-lg font-black mb-4">📦 Inventario</h2>
+                    <table class="w-full text-left text-sm"><tbody id="tablaInventarioGeneralBody"></tbody></table>
                 </div>
             </div>
 
-            <div id="tab-registro" class="tab-content hidden space-y-4 animate-fade-in">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border space-y-4">
-                        <h2 class="text-lg font-black text-gray-800 border-b pb-2">📦 Ingresar Nuevo Producto</h2>
-                        <div class="flex gap-2">
-                            <button id="btn-iniciar-camara-ingreso" onclick="iniciarCamara('ingreso')" class="w-full py-2 bg-gray-800 text-white rounded-xl font-bold text-xs">📷 Escáner Cámara</button>
-                            <button id="btn-detener-camara-ingreso" onclick="detenerCamara('ingreso')" class="w-full py-2 bg-red-600 text-white rounded-xl font-bold text-xs hidden">❌ Apagar</button>
-                        </div>
-                        <div id="reader-ingreso" class="w-full max-w-xs mx-auto rounded-xl overflow-hidden hidden mb-2"></div>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <input type="text" id="p_sku" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Código SKU (Obligatorio)">
-                            <input type="text" id="p_nom" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Nombre del Producto">
-                            <input type="text" id="p_cat" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Categoría (Ej. Bebidas)">
-                            <select id="p_prov" class="p-3 border-2 rounded-xl text-sm font-bold bg-gray-50 text-gray-700"></select>
-                            <input type="number" id="p_cos" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Costo Unitario ($)">
-                            <input type="number" id="p_pre" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Precio Venta ($)">
-                            <input type="number" id="p_mayoreo" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Precio Mayoreo (Opcional)">
-                            <input type="number" id="p_cant_mayoreo" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Cantidad Mayoreo (Opcional)">
-                            <input type="number" id="p_stk" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Cantidad que Entra">
-                            <input type="number" id="p_min" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Stock Mínimo Alerta">
-                            <input type="number" id="p_max" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Stock Máximo Sugerido">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-500 mb-1">Caducidad</label>
-                                <input type="date" id="p_caducidad" class="w-full p-3 border-2 rounded-xl text-sm font-bold text-gray-600">
-                            </div>
-                        </div>
-                        <label class="flex items-center gap-2 bg-gray-50 p-3 rounded-xl border cursor-pointer">
-                            <input type="checkbox" id="p_granel" class="w-5 h-5 accent-orange-500">
-                            <span class="text-xs font-bold text-gray-700">⚖️ Este producto se vende a granel (permite decimales en ventas)</span>
-                        </label>
-                        <button onclick="guardarProducto()" class="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition">Guardar en Inventario</button>
+            <div id="tab-agotados" class="tab-content hidden animate-fade-in">
+                <div class="bg-white p-4 rounded-2xl border">
+                    <div class="flex justify-between items-center mb-4 border-b pb-4">
+                        <h2 class="text-lg font-black">🚨 Alertas y Resurtido</h2>
+                        <button onclick="generarOrdenCompra()" class="px-5 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-lg">📋 Generar Orden de Compra</button>
                     </div>
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border space-y-4">
-                        <h2 class="text-lg font-black text-gray-800 border-b pb-2">📂 Importación Masiva (Excel/XML/TXT)</h2>
-                        <div class="border-4 border-dashed rounded-2xl p-6 text-center hover:bg-gray-50 transition cursor-pointer relative">
-                            <input type="file" id="archivoInventario" onchange="procesarArchivoMasivo()" class="absolute inset-0 opacity-0 cursor-pointer">
-                            <p class="text-2xl">📁</p>
-                            <p class="text-sm font-bold text-gray-700 mt-2">Toca aquí para seleccionar tu archivo de inventario</p>
-                            <p class="text-xs text-gray-400 mt-1">Soporta .xml de Punto de Venta viejo o listas .txt separadas por comas</p>
-                        </div>
-                        <div id="statusCargaMasiva" class="hidden"></div>
-                    </div>
+                    <table class="w-full text-left text-sm"><tbody id="tablaAgotadosBody"></tbody></table>
                 </div>
             </div>
 
-            <div id="tab-agotados" class="tab-content hidden space-y-4 animate-fade-in">
-                <div class="bg-white p-4 rounded-2xl shadow-sm border space-y-4">
-                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4">
-                        <div>
-                            <h2 class="text-lg font-black text-gray-800">🚨 Centro de Alertas y Resurtido</h2>
-                            <p class="text-xs text-gray-400 mt-0.5">Productos ordenados automáticamente por prioridad de ganancia estimada</p>
-                        </div>
-                        <button onclick="generarOrdenCompra()" class="px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg transition flex items-center gap-2 text-sm">📋 Generar Orden de Compra</button>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                        <select id="alerta_filtro_tipo" onchange="renderAgotados()" class="p-3 border-2 rounded-xl text-sm font-bold bg-gray-50 text-gray-700">
-                            <option value="todas">Todas las alertas</option>
-                            <option value="stock">Bajo Stock / Agotados</option>
-                            <option value="caducidad">Próximos a caducar (30 días)</option>
-                        </select>
-                        <select id="alerta_filtro_cat" onchange="renderAgotados()" class="p-3 border-2 rounded-xl text-sm font-bold bg-gray-50 text-gray-700"></select>
-                        <button onclick="renderAgotados()" class="py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm transition">🔄 Sincronizar Alertas</button>
-                    </div>
-                    <div class="overflow-x-auto rounded-xl border">
-                        <table class="w-full border-collapse text-left text-sm">
-                            <thead>
-                                <tr class="bg-gray-800 text-white">
-                                    <th class="p-3">Detalle del Producto</th>
-                                    <th class="p-3 text-center">Stock / Límite</th>
-                                    <th class="p-3">Estado Alerta</th>
-                                    <th class="p-3 text-right">Ganancia Unitaria</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaAgotadosBody"></tbody>
-                        </table>
-                    </div>
+            <div id="tab-orden" class="tab-content hidden max-w-2xl mx-auto animate-fade-in">
+                <div class="bg-emerald-500 p-5 rounded-2xl text-white mb-6 flex justify-between items-center">
+                    <h2 class="text-2xl font-black">📝 Lista de Pedido</h2>
+                    <button onclick="enviarOrdenWhatsApp()" class="px-6 py-3 bg-white text-emerald-700 rounded-xl font-extrabold shadow-md">📲 Enviar por WhatsApp</button>
                 </div>
-            </div>
-
-            <div id="tab-orden" class="tab-content hidden p-4 max-w-2xl mx-auto animate-fade-in">
-                <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-5 rounded-2xl shadow-xl text-white mb-6 flex flex-col sm:flex-row justify-between items-center gap-4">
-                    <div>
-                        <h2 class="text-2xl font-black flex items-center gap-2">📝 Lista de Pedido</h2>
-                        <p class="text-xs text-green-100 mt-1">Revisa y ajusta las cantidades antes de enviar</p>
-                    </div>
-                    <button onclick="enviarOrdenWhatsApp()" class="w-full sm:w-auto px-6 py-3 bg-white text-emerald-700 hover:bg-green-50 rounded-xl font-extrabold shadow-md flex items-center justify-center gap-2 transition transform active:scale-95 text-base">
-                        📲 Enviar por WhatsApp
-                    </button>
-                </div>
-                
                 <div id="contenedorTarjetasOrden" class="space-y-4"></div>
                 
-                <div class="mt-6 bg-gray-900 text-white p-5 rounded-2xl shadow-lg flex justify-between items-center border-2 border-emerald-500">
-                    <span class="text-sm font-bold text-gray-400 uppercase tracking-wider">Total Estimado del Pedido:</span>
+                <div class="mt-6 bg-gray-900 text-white p-5 rounded-2xl shadow-lg flex justify-between items-center">
+                    <span class="font-bold text-gray-400">Total Estimado:</span>
                     <span id="totalOrdenTab" class="text-2xl font-black text-green-400">$0.00</span>
                 </div>
             </div>
-
-            <div id="tab-proveedores" class="tab-content hidden space-y-4 animate-fade-in">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border space-y-4 h-fit">
-                        <h2 class="text-lg font-black text-gray-800 border-b pb-2">🚚 Registrar Nuevo Proveedor</h2>
-                        <div class="space-y-3">
-                            <input type="text" id="prov_nombre" class="w-full p-3 border-2 rounded-xl text-sm font-bold" placeholder="Nombre Comercial de Empresa">
-                            <input type="text" id="prov_tel" class="w-full p-3 border-2 rounded-xl text-sm font-bold" placeholder="Teléfono / Contacto">
-                            <textarea id="prov_notas" class="w-full p-3 border-2 rounded-xl text-sm font-bold h-24" placeholder="Notas adicionales o catálogo resumido..."></textarea>
-                            <div class="bg-gray-50 p-3 rounded-xl border">
-                                <span class="block text-xs font-bold text-gray-500 uppercase mb-2">Días normales de visita:</span>
-                                <div class="grid grid-cols-4 gap-2">
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" class="prov_dia accent-orange-500" value="L"> L</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" class="prov_dia accent-orange-500" value="M"> M</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" class="prov_dia accent-orange-500" value="Mi"> Mi</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" class="prov_dia accent-orange-500" value="J"> J</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" class="prov_dia accent-orange-500" value="V"> V</label>
-                                    <label class="flex items-center gap-1 text-xs font-bold text-gray-700"><input type="checkbox" class="prov_dia accent-orange-500" value="S"> S</label>
-                                </div>
-                            </div>
-                            <button onclick="guardarProveedor()" class="w-full py-3 bg-teal-600 hover:bg-teal-700 text-white font-bold rounded-xl transition shadow-md">Guardar Proveedor</button>
-                        </div>
-                    </div>
-                    <div class="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm border space-y-4">
-                        <div class="flex justify-between items-center border-b pb-2">
-                            <h2 class="text-lg font-black text-gray-800">Directory de Proveedores</h2>
-                            <button onclick="cargarProveedores()" class="text-xs font-bold text-teal-600 hover:underline">🔄 Refrescar Directorio</button>
-                        </div>
-                        <div class="overflow-x-auto rounded-xl border">
-                            <table class="w-full border-collapse text-left text-sm">
-                                <thead>
-                                    <tr class="bg-gray-800 text-white">
-                                        <th class="p-3">Proveedor / Tel</th>
-                                        <th class="p-3">Días de Visita</th>
-                                        <th class="p-3">Notas / Productos</th>
-                                        <th class="p-3">Acción</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tablaProveedoresBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="tab-kardex" class="tab-content hidden space-y-4 animate-fade-in">
-                <div class="bg-white p-4 rounded-2xl shadow-sm border space-y-4">
-                    <div class="flex justify-between items-center border-b pb-2">
-                        <h2 class="text-lg font-black text-gray-800">📋 Kardex (Historial de Movimientos)</h2>
-                        <span class="text-xs text-gray-400 font-bold">Muestra los últimos 100 movimientos en tiempo real</span>
-                    </div>
-                    <div class="flex border-b">
-                        <button id="btn-kardex-entradas" onclick="cargarKardex('entradas')" class="px-4 py-2 font-bold text-sm">Entradas & Ajustes</button>
-                        <button id="btn-kardex-salidas" onclick="cargarKardex('salidas')" class="px-4 py-2 font-bold text-sm">Salidas (Ventas)</button>
-                    </div>
-                    <div class="overflow-x-auto rounded-xl border">
-                        <table class="w-full border-collapse text-left text-sm">
-                            <thead>
-                                <tr class="bg-gray-800 text-white">
-                                    <th class="p-3">Fecha y Hora</th>
-                                    <th class="p-3">Tipo Movimiento</th>
-                                    <th class="p-3">SKU</th>
-                                    <th class="p-3">Producto</th>
-                                    <th class="p-3 text-center">Piezas</th>
-                                    <th class="p-3">Responsable</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaKardexBody"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div id="tab-reportes" class="tab-content hidden space-y-4 animate-fade-in">
-                <div class="bg-white p-4 rounded-2xl shadow-sm border space-y-4">
-                    <h2 class="text-lg font-black text-gray-800 border-b pb-2">📈 Dashboard de Ventas</h2>
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha de Inicio</label>
-                            <input type="date" id="rep_inicio" class="w-full p-2.5 border-2 rounded-xl text-xs font-bold text-gray-600">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha de Fin</label>
-                            <input type="date" id="rep_fin" class="w-full p-2.5 border-2 rounded-xl text-xs font-bold text-gray-600">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] font-bold text-gray-500 uppercase mb-1">Filtro Categoría</label>
-                            <select id="rep_cat" class="w-full p-2.5 border-2 rounded-xl text-xs font-bold bg-gray-50 text-gray-700"></select>
-                        </div>
-                        <div class="flex items-end gap-1">
-                            <button onclick="generarReporte()" class="w-full py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs shadow-md transition">Generar Reporte</button>
-                            <button onclick="descargarCSV()" class="w-full py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs shadow-md transition">Exportar a Excel</button>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
-                        <div class="bg-orange-50 p-4 rounded-2xl border border-orange-100 text-center"><span class="block text-xs font-bold text-orange-600 uppercase tracking-wider">Total Ingresos ($)</span><span id="rep_total_vendido" class="text-2xl font-black text-orange-700">$0.00</span></div>
-                        <div class="bg-green-50 p-4 rounded-2xl border border-green-100 text-center"><span class="block text-xs font-bold text-green-600 uppercase tracking-wider">Piezas Vendidas</span><span id="rep_piezas_vendidas" class="text-2xl font-black text-green-700">0</span></div>
-                        <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-center"><span class="block text-xs font-bold text-indigo-600 uppercase tracking-wider">Ticket Promedio</span><span id="rep_ticket_promedio" class="text-2xl font-black text-indigo-700">$0.00</span></div>
-                    </div>
-                    <div class="overflow-x-auto rounded-xl border">
-                        <table class="w-full border-collapse text-left text-sm">
-                            <thead>
-                                <tr class="bg-gray-800 text-white">
-                                    <th class="p-3">Fecha</th>
-                                    <th class="p-3">Producto</th>
-                                    <th class="p-3">Categoría</th>
-                                    <th class="p-3 text-center">Cant</th>
-                                    <th class="p-3">Vendedor</th>
-                                    <th class="p-3 text-right">Total Venta</th>
-                                </tr>
-                            </thead>
-                            <tbody id="tablaReportesBody">
-                                <tr><td colspan="6" class="text-center p-8 text-gray-400">Selecciona fechas y presiona Generar Reporte</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div id="tab-usuarios" class="tab-content hidden space-y-4 animate-fade-in">
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <div class="bg-white p-4 rounded-2xl shadow-sm border space-y-4 h-fit">
-                        <h2 class="text-lg font-black text-gray-800 border-b pb-2">👥 Registrar Nuevo Colaborador</h2>
-                        <div class="space-y-3">
-                            <input type="text" id="new_user" class="w-full p-3 border-2 rounded-xl text-sm font-bold" placeholder="Nombre de Usuario único">
-                            <input type="email" id="new_email" class="w-full p-3 border-2 rounded-xl text-sm font-bold" placeholder="Correo electrónico del empleado">
-                            <input type="password" id="new_pass" class="w-full p-3 border-2 rounded-xl text-sm font-bold" placeholder="Contraseña temporal">
-                            <select id="new_role" class="w-full p-3 border-2 rounded-xl text-sm font-bold bg-gray-50 text-gray-700">
-                                <option value="Vendedor">Rol: Vendedor (Solo cobros)</option>
-                                <option value="Gerente">Rol: Gerente (Acceso a Inventario y Proveedores)</option>
-                            </select>
-                            <button onclick="crearUsuarioSecundario()" class="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-md transition">Crear Acceso</button>
-                        </div>
-                    </div>
-                    <div class="lg:col-span-2 bg-white p-4 rounded-2xl shadow-sm border space-y-4">
-                        <div class="flex justify-between items-center border-b pb-2">
-                            <h2 class="text-lg font-black text-gray-800">Equipo de Trabajo</h2>
-                            <button onclick="cargarUsuarios()" class="text-xs font-bold text-orange-600 hover:underline">🔄 Refrescar Personal</button>
-                        </div>
-                        <div class="overflow-x-auto rounded-xl border">
-                            <table class="w-full border-collapse text-left text-sm">
-                                <thead>
-                                    <tr class="bg-gray-800 text-white">
-                                        <th class="p-3">Usuario</th>
-                                        <th class="p-3">Puesto / Rol</th>
-                                        <th class="p-3">Zonas Permitidas</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="tablaUsuariosBody"></tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </main>
     </div>
 
-    <div id="modalEdicion" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white p-6 rounded-2xl max-w-lg w-full shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto animate-fade-in">
-            <h2 class="text-xl font-black text-gray-800 border-b pb-2">✏️ Editar Inventario</h2>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">SKU</label>
-                    <input type="text" id="edit_sku" class="w-full p-2.5 border-2 rounded-xl bg-gray-100 font-bold text-gray-500 text-sm" disabled>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Nombre del Producto</label>
-                    <input type="text" id="edit_nom" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Categoría</label>
-                    <input type="text" id="edit_cat" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Proveedor</label>
-                    <select id="edit_prov" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm bg-gray-50 text-gray-700"></select>
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Costo Unitario ($)</label>
-                    <input type="number" id="edit_cos" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Precio Normal ($)</label>
-                    <input type="number" id="edit_pre" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Precio Promo ($ - Cero para desactivar)</label>
-                    <input type="number" id="edit_promo" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm text-red-600">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Precio Mayoreo ($)</label>
-                    <input type="number" id="edit_mayoreo" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm text-blue-600">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Cantidad mínima para Mayoreo</label>
-                    <input type="number" id="edit_cant_mayoreo" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm text-blue-600">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Stock Real en Tienda</label>
-                    <input type="number" id="edit_stk" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Stock Mínimo (Alerta)</label>
-                    <input type="number" id="edit_min" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Stock Máximo</label>
-                    <input type="number" id="edit_max" class="w-full p-2.5 border-2 rounded-xl font-bold text-sm">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Caducidad</label>
-                    <input type="date" id="edit_caducidad" class="w-full p-2.5 border-2 rounded-xl text-gray-600 font-bold text-sm">
-                </div>
-            </div>
-            <label class="flex items-center gap-2 bg-gray-50 p-3 rounded-xl border cursor-pointer">
-                <input type="checkbox" id="edit_granel" class="w-5 h-5 accent-orange-500">
-                <span class="text-xs font-bold text-gray-700">⚖️ Venta por granel</span>
-            </label>
-            <div class="flex justify-end gap-2 pt-2 border-t">
-                <button onclick="cerrarModalEdicion()" class="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition text-sm">Cancelar</button>
-                <button onclick="guardarEdicionProducto()" class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition text-sm shadow-md">Guardar Cambios</button>
-            </div>
+    <div id="modal-registro-rapido" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white p-6 rounded-2xl max-w-sm w-full shadow-2xl space-y-4">
+            <h2 class="text-xl font-black">⚡ Registro Express</h2>
+            <input type="text" id="rr_sku" class="w-full p-3 border-2 rounded-xl" placeholder="SKU">
+            <input type="text" id="rr_nombre" class="w-full p-3 border-2 rounded-xl" placeholder="Nombre">
+            <input type="number" id="rr_costo" class="w-full p-3 border-2 rounded-xl" placeholder="Costo">
+            <input type="number" id="rr_precio" class="w-full p-3 border-2 rounded-xl" placeholder="Precio">
+            <button onclick="guardarRegistroRapido()" class="w-full py-3 bg-orange-500 text-white font-bold rounded-xl">Guardar</button>
         </div>
     </div>
-
-    <div id="modal-registro-rapido" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white p-6 rounded-2xl max-w-sm w-full shadow-2xl space-y-4 animate-fade-in">
-            <div class="border-b pb-2">
-                <h2 class="text-xl font-black text-gray-800 flex items-center gap-1">⚡ Registro Express</h2>
-                <p class="text-xs text-gray-400 mt-0.5">Da de alta un producto nuevo para cobrarlo inmediatamente.</p>
-            </div>
-            <div class="space-y-3">
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">SKU / Código de Barras</label>
-                    <input type="text" id="rr_sku" class="w-full p-3 border-2 rounded-xl font-bold text-sm bg-gray-50 text-gray-700" placeholder="Código de Barras">
-                </div>
-                <div>
-                    <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Nombre del Producto</label>
-                    <input type="text" id="rr_nombre" class="w-full p-3 border-2 rounded-xl font-bold text-sm focus:ring-2 focus:ring-orange-500 outline-none" placeholder="Ej. Coca Cola 600ml">
-                </div>
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Costo ($)</label>
-                        <input type="number" id="rr_costo" class="w-full p-3 border-2 rounded-xl font-bold text-sm" placeholder="0.00">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-bold text-gray-400 uppercase mb-0.5">Precio Venta ($)</label>
-                        <input type="number" id="rr_precio" class="w-full p-3 border-2 rounded-xl font-bold text-sm" placeholder="0.00">
-                    </div>
-                </div>
-            </div>
-            <div class="flex justify-end gap-2 pt-2 border-t">
-                <button onclick="cerrarModalRegistroRapido()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl text-sm transition">Cancelar</button>
-                <button onclick="guardarRegistroRapido()" class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-sm transition shadow-md">Guardar y Agregar</button>
-            </div>
-        </div>
-    </div>
-
-    <iframe id="iframeImpresion" style="display:none;"></iframe>
 
     <script type="module" src="/main.js"></script>
 </body>
