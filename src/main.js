@@ -19,7 +19,6 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 const secondaryAuth = getAuth(secondaryApp);
 
-// 2. VARIABLES GLOBALES
 window.db = db;
 window.inventarioLocal = []; 
 window.carrito = [];
@@ -28,7 +27,6 @@ window.kardexActual = 'entradas';
 window.datosReporteCSV = [];
 window.categoriasUnicas = new Set(); 
 
-// 3. UTILIDADES Y NAVEGACIÓN
 window.mostrarNotificacion = (mensaje) => {
     try { const beep = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'); beep.volume = 0.5; beep.play(); } catch(e) {}
     const cont = document.getElementById('toast-container'); const t = document.createElement('div');
@@ -105,11 +103,7 @@ window.registrarNegocio = async () => {
         
         alert("Negocio creado. Inicia sesión."); 
         window.toggleAuth(); 
-    } catch (er) { 
-        alert("Error: " + er.message); 
-    } finally { 
-        btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; 
-    }
+    } catch (er) { alert("Error: " + er.message); } finally { btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; }
 };
 
 window.iniciarSesion = async () => { 
@@ -122,14 +116,10 @@ window.iniciarSesion = async () => {
     
     try {
         const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); 
-        if(!dirDoc.exists()) { 
-            btn.innerText = "Entrar"; btn.disabled = false; 
-            return alert("Usuario no encontrado."); 
-        }
+        if(!dirDoc.exists()) { btn.innerText = "Entrar"; btn.disabled = false; return alert("Usuario no encontrado."); }
         
         const cred = await signInWithEmailAndPassword(auth, dirDoc.data().email, p); 
         const uid = cred.user.uid;
-        
         const userDoc = await getDoc(doc(db, "SaaS_Usuarios", uid));
         
         if (userDoc.exists()) { 
@@ -140,11 +130,7 @@ window.iniciarSesion = async () => {
             localStorage.setItem('userRol', d.rol || "Vendedor"); 
             iniciarApp(); 
         }
-    } catch (er) { 
-        alert("Contraseña incorrecta o error de conexión."); 
-    } finally { 
-        btn.innerText = "Entrar"; btn.disabled = false; 
-    }
+    } catch (er) { alert("Contraseña incorrecta o error de conexión."); } finally { btn.innerText = "Entrar"; btn.disabled = false; }
 };
 
 window.recuperarPassword = async () => { 
@@ -168,22 +154,17 @@ function iniciarApp() {
         const u = localStorage.getItem('currentUser') || "Usuario"; 
         const r = localStorage.getItem('userRol') || "Vendedor"; 
         let zs = []; 
-        try { 
-            zs = JSON.parse(localStorage.getItem('zonas') || "[]"); 
-            if (!Array.isArray(zs) || zs.length === 0) zs = ["General"]; 
-        } catch(e) { zs = ["General"]; }
+        try { zs = JSON.parse(localStorage.getItem('zonas') || "[]"); if (!Array.isArray(zs) || zs.length === 0) zs = ["General"]; } catch(e) { zs = ["General"]; }
         
         document.getElementById('displayEmpresa').innerText = e; 
         document.getElementById('displayUser').innerText = `${u} (${r})`;
         
         const sZ = document.getElementById('zonaSelect'); 
-        sZ.innerHTML = ""; 
-        zs.forEach(z => sZ.add(new Option(z, z)));
+        sZ.innerHTML = ""; zs.forEach(z => sZ.add(new Option(z, z)));
 
         if (r === 'Dueño' || r === 'Gerente') {
             ['btn-tab-registro','btn-tab-kardex','btn-tab-reportes','btn-tab-agotados','btn-tab-proveedores','btn-tab-orden','btnAgregarZona'].forEach(id => {
-                const btnRef = document.getElementById(id);
-                if(btnRef) btnRef.classList.remove('hidden');
+                const btnRef = document.getElementById(id); if(btnRef) btnRef.classList.remove('hidden');
             });
             document.querySelectorAll('.costo-col').forEach(el => el.classList.remove('hidden')); 
             document.querySelectorAll('.accion-col').forEach(el => el.classList.remove('hidden'));
@@ -199,34 +180,29 @@ function iniciarApp() {
         
         window.cargarInventarioGeneral();
         window.cargarProveedores();
+        // ESTE FUE EL CAMBIO 1: Entrar directamente al panel de ventas.
+        window.cambiarPestaña('tab-ventas'); 
     } catch (err) { window.cerrarSesion(); }
 }
 
-// 5. CÁMARA
 let scanners = { ventas: null, ingreso: null };
 window.iniciarCamara = (m) => { 
     document.getElementById(`reader-${m}`).classList.remove('hidden'); 
     document.getElementById(`btn-iniciar-camara-${m}`).classList.add('hidden'); 
     document.getElementById(`btn-detener-camara-${m}`).classList.remove('hidden');
-    
     scanners[m] = new Html5Qrcode(`reader-${m}`);
     scanners[m].start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (decodedText) => {
         window.detenerCamara(m); 
         if (navigator.vibrate) navigator.vibrate(100); 
-        
         if(m === 'ventas') { 
             const p = window.inventarioLocal.find(x => x.sku === decodedText); 
-            if(p) {
-                window.agregarAlCarrito(p); 
-            } else {
+            if(p) { window.agregarAlCarrito(p); } else {
                 document.getElementById('venta_busqueda').value = decodedText;
                 window.abrirModalRegistroRapido();
                 window.mostrarNotificacion("⚠️ Nuevo producto detectado. Regístralo.");
             }
-        } else { 
-            document.getElementById('p_sku').value = decodedText; 
-        }
-    }, (e) => { }).catch(err => { alert("Cámara no soportada en este dispositivo."); });
+        } else { document.getElementById('p_sku').value = decodedText; }
+    }, (e) => { }).catch(err => { alert("Cámara no soportada."); });
 };
 
 window.detenerCamara = (m) => { 
@@ -239,7 +215,6 @@ window.detenerCamara = (m) => {
     }
 };
 
-// 6. INVENTARIO Y FILTROS
 function poblarFiltros() {
     let htmlCat = `<option value="Todas">Todas las categorías</option>`;
     window.categoriasUnicas.forEach(c => { if(c) htmlCat += `<option value="${c}">${c}</option>`; });
@@ -248,42 +223,29 @@ function poblarFiltros() {
 }
 
 window.cargarInventarioGeneral = async () => {
-    const z = document.getElementById('zonaSelect').value; 
-    const e = localStorage.getItem('empresaId');
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId');
     if(!z || !e) return;
-    
     document.getElementById('tablaInventarioGeneralBody').innerHTML = "<tr><td colspan='7' class='p-8 text-center'>Cargando base de datos...</td></tr>";
     
     try {
         const sn = await getDocs(collection(db, `${e}_Inventario_${z}`));
-        window.inventarioLocal = []; 
-        window.categoriasUnicas.clear();
-        
+        window.inventarioLocal = []; window.categoriasUnicas.clear();
         sn.forEach((d) => {
-            const p = d.data(); 
-            window.inventarioLocal.push(p);
+            const p = d.data(); window.inventarioLocal.push(p);
             if(p.categoria) window.categoriasUnicas.add(p.categoria);
         });
-        
-        poblarFiltros();
-        window.renderInventarioPantalla();
+        poblarFiltros(); window.renderInventarioPantalla();
         if(!document.getElementById('tab-agotados').classList.contains('hidden')) window.renderAgotados();
-    } catch(err) { 
-        document.getElementById('tablaInventarioGeneralBody').innerHTML = "<tr><td colspan='7' class='text-red-500 p-8'>Error al conectar con el inventario</td></tr>"; 
-    }
+    } catch(err) { document.getElementById('tablaInventarioGeneralBody').innerHTML = "<tr><td colspan='7' class='text-red-500 p-8'>Error al conectar</td></tr>"; }
 };
 
 window.renderInventarioPantalla = () => {
-    const r = localStorage.getItem('userRol'); 
-    const tb = document.getElementById('tablaInventarioGeneralBody');
-    const txt = document.getElementById('filtro_inv_txt').value.toLowerCase();
-    const cat = document.getElementById('filtro_inv_cat').value;
-    const ord = document.getElementById('filtro_inv_ord').value;
+    const r = localStorage.getItem('userRol'); const tb = document.getElementById('tablaInventarioGeneralBody');
+    const txt = document.getElementById('filtro_inv_txt').value.toLowerCase(); const cat = document.getElementById('filtro_inv_cat').value; const ord = document.getElementById('filtro_inv_ord').value;
 
     let lista = window.inventarioLocal.filter(p => {
         const coincideTxt = p.nombre.toLowerCase().includes(txt) || p.sku.toLowerCase().includes(txt);
-        const coincideCat = (cat === "Todas" || p.categoria === cat);
-        return coincideTxt && coincideCat;
+        const coincideCat = (cat === "Todas" || p.categoria === cat); return coincideTxt && coincideCat;
     });
 
     if(ord === 'nombre') lista.sort((a,b) => a.nombre.localeCompare(b.nombre));
@@ -293,22 +255,15 @@ window.renderInventarioPantalla = () => {
     let h = "";
     lista.forEach(p => {
         const isManager = (r === 'Dueño' || r === 'Gerente');
-        
         const cc = isManager ? `<td class="p-3 text-left costo-col">$${p.costo || 0}</td>` : `<td class="p-3 text-left costo-col hidden"></td>`;
         const ca = isManager ? `<td class="p-3 text-center accion-col md:min-w-[200px]">
-            <button onclick="abrirModalEdicion('${p.sku}')" class="text-blue-600 bg-blue-50 px-3 py-2 rounded font-bold hover:bg-blue-100 transition mb-1 md:mb-0 md:mr-2 text-lg" title="Editar">✏️</button>
-            <button onclick="eliminarProducto('${p.sku}')" class="text-red-600 bg-red-50 px-3 py-2 rounded font-bold hover:bg-red-100 transition text-lg" title="Borrar">🗑️</button>
-        </td>` : `<td class="p-3 text-left accion-col hidden"></td>`;
-        
+            <button onclick="abrirModalEdicion('${p.sku}')" class="text-blue-600 bg-blue-50 px-3 py-2 rounded font-bold hover:bg-blue-100 transition mb-1 md:mb-0 md:mr-2 text-lg">✏️</button>
+            <button onclick="eliminarProducto('${p.sku}')" class="text-red-600 bg-red-50 px-3 py-2 rounded font-bold hover:bg-red-100 transition text-lg">🗑️</button></td>` : `<td class="p-3 text-left accion-col hidden"></td>`;
         const stockVal = p.stock % 1 !== 0 ? p.stock.toFixed(3) : p.stock;
-        
         let badges = `<span class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded block mb-1 w-fit">${p.categoria || 'General'}</span>`;
         if(p.es_granel) badges += `<span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded block w-fit font-bold mb-1">Granel</span>`;
         if(p.proveedor) badges += `<span class="bg-teal-50 text-teal-700 text-[10px] font-bold px-2 py-1 rounded block w-fit mb-1 border border-teal-200">🚚 ${p.proveedor}</span>`;
-        if(p.caducidad) {
-            const diff = Math.floor((new Date(p.caducidad) - Date.now()) / 86400000);
-            if(diff <= 30) badges += `<span class="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded block w-fit font-bold">Vence en ${diff}d</span>`;
-        }
+        if(p.caducidad) { const diff = Math.floor((new Date(p.caducidad) - Date.now()) / 86400000); if(diff <= 30) badges += `<span class="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded block w-fit font-bold">Vence en ${diff}d</span>`; }
 
         let precioStr = `<span class="text-green-600 font-bold block">$${p.precio}</span>`;
         if (p.precio_promo && p.precio_promo > 0) precioStr = `<span class="text-xs text-red-500 line-through block">$${p.precio}</span><span class="text-green-600 font-bold block">$${p.precio_promo} <span class="text-[10px] text-red-500 font-normal">(Promo)</span></span>`;
@@ -320,38 +275,21 @@ window.renderInventarioPantalla = () => {
 };
 
 window.eliminarProducto = async (sku) => {
-    if(!confirm(`⚠️ ¿Estás seguro de ELIMINAR el producto ${sku}? Esta acción no se puede deshacer.`)) return;
-    
-    const z = document.getElementById('zonaSelect').value;
-    const e = localStorage.getItem('empresaId');
-    const u = localStorage.getItem('currentUser');
-    
+    if(!confirm(`⚠️ ¿Estás seguro de ELIMINAR el producto ${sku}?`)) return;
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser');
     try {
-        const pRef = doc(db, `${e}_Inventario_${z}`, sku);
-        const pSnap = await getDoc(pRef);
-        
+        const pRef = doc(db, `${e}_Inventario_${z}`, sku); const pSnap = await getDoc(pRef);
         if(pSnap.exists()) {
-            const pData = pSnap.data();
             await deleteDoc(pRef);
-            
-            await addDoc(collection(db, `${e}_Historial_Ingresos`), { 
-                sku, nombre: pData.nombre, cantidad: pData.stock, zona: z, usuario: u, 
-                fechaRegistro: new Date().toLocaleString('es-MX'), timestamp: Date.now(), tipoMovimiento: "ELIMINACIÓN" 
-            });
-            
-            window.mostrarNotificacion("🗑️ Producto eliminado correctamente");
-            window.cargarInventarioGeneral(); 
+            await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: pSnap.data().nombre, cantidad: pSnap.data().stock, zona: z, usuario: u, fechaRegistro: new Date().toLocaleString('es-MX'), timestamp: Date.now(), tipoMovimiento: "ELIMINACIÓN" });
+            window.mostrarNotificacion("🗑️ Producto eliminado correctamente"); window.cargarInventarioGeneral(); 
         }
-    } catch(er) {
-        alert("Ocurrió un error al intentar eliminar el producto.");
-    }
+    } catch(er) { alert("Ocurrió un error."); }
 };
 
-// 7. MÓDULO DE VENTAS 
 window.filtrarProductosVenta = () => {
     const i = document.getElementById('venta_busqueda').value.toLowerCase(); 
     const c = document.getElementById('sugerencias_venta'); c.innerHTML = '';
-    
     if (i.length < 1) { c.classList.add('hidden'); return; }
     const r = window.inventarioLocal.filter(p => p.sku.toLowerCase().includes(i) || p.nombre.toLowerCase().includes(i));
     
@@ -360,44 +298,32 @@ window.filtrarProductosVenta = () => {
         r.forEach(p => { 
             const precioActivo = window.calcularPrecioExacto(p, 1);
             const textoPromo = (precioActivo !== p.precio) ? `<span class="text-xs text-red-500 line-through mr-2">$${p.precio}</span>` : '';
-            const d = document.createElement('div'); 
-            d.className = "p-4 hover:bg-orange-50 cursor-pointer border-b flex justify-between items-center"; 
+            const d = document.createElement('div'); d.className = "p-4 hover:bg-orange-50 cursor-pointer border-b flex justify-between items-center"; 
             d.innerHTML = `<div><span class="text-orange-600 font-bold">${p.sku}</span><br><span class="text-gray-700">${p.nombre}</span></div> <div>${textoPromo}<span class="text-green-600 font-bold">$${precioActivo}</span></div>`; 
             d.onclick = () => { window.agregarAlCarrito(p); document.getElementById('venta_busqueda').value = ''; c.classList.add('hidden'); }; 
             c.appendChild(d); 
         });
-    } else { 
-        c.classList.add('hidden'); 
-    }
+    } else { c.classList.add('hidden'); }
 };
 
-document.addEventListener('click', (e) => { 
-    if(e.target.id !== 'venta_busqueda') document.getElementById('sugerencias_venta').classList.add('hidden'); 
-});
+document.addEventListener('click', (e) => { if(e.target.id !== 'venta_busqueda') document.getElementById('sugerencias_venta').classList.add('hidden'); });
 
 window.agregarAlCarrito = (p) => {
     if(p.stock <= 0) return window.mostrarNotificacion(`⚠️ Producto Agotado.`); 
-    
     const ex = window.carrito.find(i => i.sku === p.sku);
     if (ex) { 
-        if(ex.cantidad < p.stock) { 
-            ex.cantidad++; 
-            ex.precioVentaReal = window.calcularPrecioExacto(ex, ex.cantidad); 
-        } else { 
-            return window.mostrarNotificacion("⚠️ Límite de stock alcanzado."); 
-        } 
+        if(ex.cantidad < p.stock) { ex.cantidad++; ex.precioVentaReal = window.calcularPrecioExacto(ex, ex.cantidad); } 
+        else { return window.mostrarNotificacion("⚠️ Límite de stock alcanzado."); } 
     } else { 
-        let n = { ...p, cantidad: 1 }; 
-        n.precioVentaReal = window.calcularPrecioExacto(n, 1); 
-        window.carrito.push(n); 
+        let n = { ...p, cantidad: 1 }; n.precioVentaReal = window.calcularPrecioExacto(n, 1); window.carrito.push(n); 
     }
-    window.mostrarNotificacion(`✅ Agregado al carrito`); 
-    window.renderCarrito();
+    window.mostrarNotificacion(`✅ Agregado al carrito`); window.renderCarrito();
 };
 
+// ESTE FUE EL CAMBIO 4: Permitir que "granel" lea decimales limpios y no se resetee a 1.
 window.cambiarCantidadCarrito = (sku, val) => { 
     let cant = parseFloat(val); 
-    if (isNaN(cant) || cant <= 0) cant = 1;
+    if (isNaN(cant)) return; 
     
     const item = window.carrito.find(p => p.sku === sku); 
     if(item) { 
@@ -409,6 +335,7 @@ window.cambiarCantidadCarrito = (sku, val) => {
             window.mostrarNotificacion(`⚠️ Solo hay ${item.stock} en stock.`); 
             cant = item.stock; 
         }
+        if(cant <= 0) cant = item.es_granel ? 0.01 : 1;
         
         item.cantidad = cant; 
         item.precioVentaReal = window.calcularPrecioExacto(item, cant); 
@@ -416,30 +343,26 @@ window.cambiarCantidadCarrito = (sku, val) => {
     } 
 };
 
-window.quitarDelCarrito = (i) => { 
-    window.carrito.splice(i, 1); 
-    window.renderCarrito(); 
-};
+window.quitarDelCarrito = (i) => { window.carrito.splice(i, 1); window.renderCarrito(); };
 
 window.renderCarrito = () => {
     const tb = document.getElementById('tabla-carrito'); tb.innerHTML = ''; let t = 0;
-    
     if (window.carrito.length === 0) { 
         tb.innerHTML = '<tr><td colspan="4" class="text-center text-gray-400 py-8">El carrito está vacío</td></tr>'; 
-        document.getElementById('gran-total').innerText = "$0.00"; 
-        return; 
+        document.getElementById('gran-total').innerText = "$0.00"; return; 
     }
     
     window.carrito.forEach((i, idx) => { 
-        const sub = i.precioVentaReal * i.cantidad; 
-        t += sub; 
-        const cant = i.cantidad % 1 !== 0 ? i.cantidad.toFixed(3) : i.cantidad;
+        const sub = i.precioVentaReal * i.cantidad; t += sub; 
+        const cant = i.cantidad % 1 !== 0 ? parseFloat(i.cantidad).toFixed(3) : i.cantidad;
         const badge = (i.precioVentaReal === i.precio_mayoreo && i.precio_mayoreo > 0) ? `<span class="bg-green-100 text-green-700 text-[10px] px-1 rounded ml-2">MAYOREO</span>` : ``;
         
+        // ESTE FUE EL CAMBIO 4 (Visual): Modificar el "step" a 0.01 y poner el letrerito de L/Kg
         tb.innerHTML += `<tr class="border-b">
             <td class="py-4 font-bold text-gray-700 text-xs">${i.nombre}${badge}</td>
-            <td class="py-4 text-center">
-                <input type="number" step="${i.es_granel ? 'any' : '1'}" min="0.01" max="${i.stock}" value="${cant}" onchange="cambiarCantidadCarrito('${i.sku}', this.value)" class="w-20 p-2 border-2 rounded text-center focus:ring-2 focus:ring-orange-500 transition-all">
+            <td class="py-4 text-center flex items-center justify-center gap-1">
+                <input type="number" step="${i.es_granel ? '0.01' : '1'}" min="${i.es_granel ? '0.01' : '1'}" max="${i.stock}" value="${cant}" onchange="cambiarCantidadCarrito('${i.sku}', this.value)" class="w-16 md:w-20 p-2 border-2 rounded-xl text-center focus:ring-2 focus:ring-orange-500 font-bold">
+                <span class="text-[10px] font-bold text-gray-500">${i.es_granel ? 'L/Kg' : 'Pz'}</span>
             </td>
             <td class="py-4 text-right text-green-600 font-bold">$${sub.toFixed(2)}</td>
             <td class="py-4 text-right"><button onclick="quitarDelCarrito(${idx})" class="text-red-500 hover:scale-110 transition-transform">🗑️</button></td>
@@ -450,48 +373,27 @@ window.renderCarrito = () => {
 
 window.procesarVentaCompleta = async () => {
     if (window.carrito.length === 0) return alert("El carrito está vacío.");
-    
-    const btn = document.getElementById('btn-cobrar'); 
-    btn.disabled = true; 
-    btn.innerText = "Procesando...";
-    
-    const z = document.getElementById('zonaSelect').value; 
-    const e = localStorage.getItem('empresaId'); 
-    const u = localStorage.getItem('currentUser');
-    const ts = Date.now(); 
-    const f = new Date(ts).toLocaleString('es-MX'); 
-    
+    const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando...";
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser');
+    const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); 
     let tot = 0; 
 
     try {
         for (const i of window.carrito) {
-            const sub = i.precioVentaReal * i.cantidad; 
-            tot += sub; 
-            
-            const ref = doc(db, `${e}_Inventario_${z}`, i.sku); 
-            const d = await getDoc(ref);
+            const sub = i.precioVentaReal * i.cantidad; tot += sub; 
+            const ref = doc(db, `${e}_Inventario_${z}`, i.sku); const d = await getDoc(ref);
             if (d.exists()) {
-                let updates = { stock: d.data().stock - i.cantidad }; 
-                await setDoc(ref, updates, { merge: true });
+                await setDoc(ref, { stock: d.data().stock - i.cantidad }, { merge: true });
                 await addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts });
             }
         }
-        
-        window.carrito = []; 
-        window.renderCarrito(); 
-        window.cargarInventarioGeneral(); 
-        btn.disabled = false; 
-        btn.innerText = "✅ Cobrar Venta"; 
-        window.mostrarNotificacion("✅ Venta registrada"); 
-    } catch(er) { 
-        alert("Ocurrió un error al procesar la venta."); 
-        btn.disabled = false; 
-        btn.innerText = "✅ Cobrar Venta"; 
-    } 
+        window.carrito = []; window.renderCarrito(); window.cargarInventarioGeneral(); 
+        btn.disabled = false; btn.innerText = "✅ Cobrar"; window.mostrarNotificacion("✅ Venta registrada"); 
+    } catch(er) { alert("Ocurrió un error."); btn.disabled = false; btn.innerText = "✅ Cobrar"; } 
 };
 
 // ======================================================================
-// 8. MÓDULO ÓRDENES DE COMPRA (ESTILO TARJETAS ACCESIBLES Y WHATSAPP)
+// 8. MÓDULO ÓRDENES DE COMPRA (ESTILO VENTAS Y AUTOGENERACIÓN)
 // ======================================================================
 
 window.renderAgotados = () => {
@@ -504,7 +406,6 @@ window.renderAgotados = () => {
 
     window.inventarioLocal.forEach(p => {
         if(filtroCat !== "Todas" && p.categoria !== filtroCat) return;
-
         const min = p.min_stk || 0;
         let msRestantesCad = p.caducidad ? (new Date(p.caducidad) - ahora) : null;
         let diasCad = msRestantesCad ? Math.ceil(msRestantesCad / 86400000) : null;
@@ -520,10 +421,8 @@ window.renderAgotados = () => {
         let estadoStr = [];
         if(esBajoStock) estadoStr.push(`<span class="text-red-600 font-bold block mb-1">Agotado/Bajo Stock</span>`);
         if(esPorCaducar) estadoStr.push(`<span class="bg-red-500 text-white text-[10px] px-2 py-1 rounded block w-fit">⚠️ Caduca en ${diasCad} días</span>`);
-
         alertas.push({ ...p, gananciaNum: gananciaNum, estadoHTML: estadoStr.join('') });
     });
-
     alertas.sort((a, b) => b.gananciaNum - a.gananciaNum);
 
     let h = "";
@@ -531,49 +430,45 @@ window.renderAgotados = () => {
         const s = p.stock % 1 !== 0 ? p.stock.toFixed(3) : p.stock;
         let ganStr = p.gananciaNum > 0 ? `<span class="text-green-600 font-bold">+$${p.gananciaNum.toFixed(2)}</span>` : `<span class="text-gray-400">N/A</span>`;
         let provStr = p.proveedor ? `<span class="text-[10px] text-teal-600 font-bold block mt-1">🚚 ${p.proveedor}</span>` : '';
-        h += `<tr class="border-b bg-white hover:bg-red-50 transition">
-            <td class="p-3"><span class="font-mono text-gray-500 text-xs block">${p.sku}</span><span class="font-bold">${p.nombre}</span><span class="text-xs text-gray-400 block">${p.categoria||''}</span>${provStr}</td>
-            <td class="p-3 text-center"><span class="font-black text-lg text-red-600">${s}</span> <span class="text-gray-400 text-xs block mt-1">Límite: ${p.min_stk||0}</span></td>
-            <td class="p-3">${p.estadoHTML}</td>
-            <td class="p-3 text-right bg-green-50/50">${ganStr}</td>
-        </tr>`;
+        h += `<tr class="border-b bg-white hover:bg-red-50 transition"><td class="p-3"><span class="font-mono text-gray-500 text-xs block">${p.sku}</span><span class="font-bold">${p.nombre}</span><span class="text-xs text-gray-400 block">${p.categoria||''}</span>${provStr}</td><td class="p-3 text-center"><span class="font-black text-lg text-red-600">${s}</span> <span class="text-gray-400 text-xs block mt-1">Límite: ${p.min_stk||0}</span></td><td class="p-3">${p.estadoHTML}</td><td class="p-3 text-right bg-green-50/50">${ganStr}</td></tr>`;
     });
     tb.innerHTML = h || "<tr><td colspan='4' class='p-8 text-center font-bold text-green-600'>✅ Todo en orden. Sin alertas actuales.</td></tr>";
 };
 
-// --- EL NUEVO BLOQUE DE ORDEN DE COMPRA Y TARJETAS GIGANTES ---
+// ESTE FUE EL CAMBIO 2: Si el usuario da clic directamente en la pestaña en la computadora
+window.abrirPestañaOrden = () => {
+    if (window.ordenCompraActual.length === 0) {
+        let faltantes = window.inventarioLocal.filter(p => parseFloat(p.stock) <= (parseFloat(p.min_stk) || 0));
+        window.ordenCompraActual = faltantes.map(p => {
+            let sugerido = (parseFloat(p.max_stk) || 0) > 0 ? (parseFloat(p.max_stk) - parseFloat(p.stock)) : 1; 
+            if (sugerido < 0) sugerido = 0;
+            return { ...p, pedir: sugerido };
+        });
+    }
+    window.cambiarPestaña('tab-orden');
+    window.renderTabOrdenCompra();
+};
+
 window.generarOrdenCompra = () => {
     let faltantes = window.inventarioLocal.filter(p => parseFloat(p.stock) <= (parseFloat(p.min_stk) || 0));
+    if(faltantes.length === 0) return alert("✅ Todo el inventario está por encima del mínimo. No se requiere orden de compra.");
     
-    if(faltantes.length === 0) {
-        return alert("✅ Todo el inventario está por encima del mínimo. No se requiere orden de compra.");
-    }
-
-    faltantes.sort((a,b) => {
-        let provA = String(a.proveedor || "Z_Sin Proveedor");
-        let provB = String(b.proveedor || "Z_Sin Proveedor");
-        let nomA = String(a.nombre || "");
-        let nomB = String(b.nombre || "");
-        return provA.localeCompare(provB) || nomA.localeCompare(nomB);
-    });
-
+    // Forzamos actualización por si había cambios
     window.ordenCompraActual = faltantes.map(p => {
         let sugerido = (parseFloat(p.max_stk) || 0) > 0 ? (parseFloat(p.max_stk) - parseFloat(p.stock)) : 1; 
         if (sugerido < 0) sugerido = 0;
         return { ...p, pedir: sugerido };
     });
-
     window.cambiarPestaña('tab-orden');
     window.renderTabOrdenCompra();
 };
 
+// ESTE FUE EL CAMBIO 3: Reemplazar botones + y - por una caja de texto idéntica a la de ventas
 window.renderTabOrdenCompra = () => {
     const contenedor = document.getElementById('contenedorTarjetasOrden');
     if(!contenedor) return;
     
-    let h = "";
-    let totalCosto = 0;
-
+    let h = ""; let totalCosto = 0;
     if (window.ordenCompraActual.length === 0) {
         contenedor.innerHTML = `<div class="bg-white p-8 rounded-2xl text-center text-gray-400 font-bold border-2 border-dashed">No hay productos en la lista</div>`;
         return;
@@ -582,13 +477,11 @@ window.renderTabOrdenCompra = () => {
     window.ordenCompraActual.forEach((p, idx) => {
         let subCosto = (parseFloat(p.costo) || 0) * (parseFloat(p.pedir) || 0);
         totalCosto += subCosto;
-        
         const stockActualStr = p.stock % 1 !== 0 ? parseFloat(p.stock).toFixed(2) : p.stock;
         const provStr = p.proveedor ? `🚚 ${p.proveedor}` : '📁 Sin Proveedor Asignado';
 
         h += `
         <div class="bg-white p-4 rounded-2xl shadow-sm border-2 border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            
             <div class="flex-1 w-full">
                 <span class="text-[11px] font-extrabold uppercase tracking-wide text-teal-600 bg-teal-50 px-2 py-0.5 rounded-md mb-1 inline-block">${provStr}</span>
                 <h3 class="text-lg font-black text-gray-800 leading-tight">${p.nombre}</h3>
@@ -597,20 +490,12 @@ window.renderTabOrdenCompra = () => {
                     <span>Costo: <strong>$${(parseFloat(p.costo)||0).toFixed(2)}</strong></span>
                 </div>
             </div>
-
             <div class="flex items-center justify-between w-full sm:w-auto gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100">
-                <div class="flex items-center bg-gray-100 p-1 rounded-xl border border-gray-200">
-                    <button onclick="window.modificarCantidadBoton(${idx}, -1)" class="w-12 h-12 bg-white text-red-600 rounded-lg font-black text-2xl shadow-sm flex items-center justify-center transition active:scale-90 select-none">
-                        −
-                    </button>
-                    <span class="w-16 text-center font-black text-2xl text-gray-800 select-none">
-                        ${p.pedir}
-                    </span>
-                    <button onclick="window.modificarCantidadBoton(${idx}, 1)" class="w-12 h-12 bg-white text-emerald-600 rounded-lg font-black text-2xl shadow-sm flex items-center justify-center transition active:scale-90 select-none">
-                        +
-                    </button>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-gray-400 uppercase">Pedir:</span>
+                    <input type="number" step="${p.es_granel ? '0.01' : '1'}" min="0" value="${p.pedir}" onchange="window.actualizarCantOrden(${idx}, this.value)" class="w-20 p-2 border-2 border-emerald-400 rounded-xl text-center font-black focus:ring-2 focus:ring-emerald-500">
+                    <span class="text-xs font-bold text-gray-500">${p.es_granel ? 'L/Kg' : 'Pzas'}</span>
                 </div>
-
                 <div class="text-right min-w-[80px]">
                     <span class="text-[10px] block text-gray-400 font-bold uppercase">Subtotal</span>
                     <span class="text-lg font-black text-orange-600">$${subCosto.toFixed(2)}</span>
@@ -618,43 +503,30 @@ window.renderTabOrdenCompra = () => {
             </div>
         </div>`;
     });
-
     contenedor.innerHTML = h;
     document.getElementById('totalOrdenTab').innerText = `$${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
 };
 
-window.modificarCantidadBoton = (idx, cambio) => {
-    let actual = parseFloat(window.ordenCompraActual[idx].pedir) || 0;
-    let nuevo = actual + cambio;
-    if (nuevo < 0) nuevo = 0; 
-    
+window.actualizarCantOrden = (idx, val) => {
+    let nuevo = parseFloat(val) || 0;
+    if (nuevo < 0) nuevo = 0;
     window.ordenCompraActual[idx].pedir = nuevo;
-    window.renderTabOrdenCompra(); 
+    window.renderTabOrdenCompra();
 };
 
 window.enviarOrdenWhatsApp = () => {
-    const e = localStorage.getItem('empresaId'); 
-    const z = document.getElementById('zonaSelect').value;
-    
+    const e = localStorage.getItem('empresaId'); const z = document.getElementById('zonaSelect').value;
     let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); 
-
-    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir. Usa el botón '+' para agregar artículos.");
+    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir. Escribe artículos a pedir en las cajas de texto.");
 
     let textoMensaje = `📋 *NUEVA ORDEN DE COMPRA*\n🏢 *Negocio:* ${e}\n📍 *Sucursal:* ${z}\n\n*Productos solicitados:*\n`;
     let totalCosto = 0;
-
     filterPedir.forEach(p => {
-        let subCosto = (parseFloat(p.costo) || 0) * p.pedir;
-        totalCosto += subCosto;
+        let subCosto = (parseFloat(p.costo) || 0) * p.pedir; totalCosto += subCosto;
         textoMensaje += `📦 ${p.pedir} x ${String(p.nombre).substring(0,25)}\n`;
     });
-
-    textoMensaje += `\n💰 *Total Estimado:* $${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}\n\n_Generado desde BOOMBOX_`;
-
-    const urlWhatsApp = `https://wa.me/?text=${encodeURIComponent(textoMensaje)}`;
-    window.open(urlWhatsApp, '_blank');
-
-    window.mostrarNotificacion("📲 Abriendo WhatsApp...");
+    textoMensaje += `\n💰 *Total Estimado:* $${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(textoMensaje)}`, '_blank');
 };
 
 // 9. PROVEEDORES
@@ -663,9 +535,7 @@ window.guardarProveedor = async () => {
     const tel = document.getElementById('prov_tel').value.trim();
     const not = document.getElementById('prov_notas').value.trim();
     const e = localStorage.getItem('empresaId');
-    
-    let dias = [];
-    document.querySelectorAll('.prov_dia:checked').forEach(c => dias.push(c.value));
+    let dias = []; document.querySelectorAll('.prov_dia:checked').forEach(c => dias.push(c.value));
     
     if(!nom) return alert("Nombre obligatorio.");
     try {
@@ -673,32 +543,25 @@ window.guardarProveedor = async () => {
         await setDoc(doc(db, `${e}_Proveedores`, id), { id, nombre: nom, telefono: tel, dias: dias, notas: not, timestamp: Date.now() });
         window.mostrarNotificacion("✅ Proveedor guardado");
         document.getElementById('prov_nombre').value = ''; document.getElementById('prov_tel').value = ''; document.getElementById('prov_notas').value = '';
-        document.querySelectorAll('.prov_dia').forEach(c => c.checked = false);
-        window.cargarProveedores();
+        document.querySelectorAll('.prov_dia').forEach(c => c.checked = false); window.cargarProveedores();
     } catch(er) { alert("Error al guardar proveedor."); }
 };
 
 window.cargarProveedores = async () => {
     const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaProveedoresBody');
     tb.innerHTML = "<tr><td colspan='4' class='text-center p-8'>Cargando...</td></tr>"; 
-    let h = "";
-    let opts = '<option value="">Seleccionar Proveedor...</option>'; 
+    let h = ""; let opts = '<option value="">Seleccionar Proveedor...</option>'; 
 
     try {
         const sn = await getDocs(collection(db, `${e}_Proveedores`));
         sn.forEach(d => {
-            const pr = d.data();
-            const diasStr = pr.dias.length > 0 ? pr.dias.join(', ') : 'Llamada previa';
+            const pr = d.data(); const diasStr = pr.dias.length > 0 ? pr.dias.join(', ') : 'Llamada previa';
             h += `<tr class="border-b"><td class="p-3"><span class="font-bold text-teal-700 block">${pr.nombre}</span><span class="text-xs text-gray-500">📞 ${pr.telefono||'Sin Tel'}</span></td><td class="p-3 text-sm font-bold">${diasStr}</td><td class="p-3 text-xs text-gray-600 whitespace-pre-wrap">${pr.notas}</td><td class="p-3"><button onclick="eliminarProveedor('${pr.id}')" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded transition">🗑️</button></td></tr>`;
             opts += `<option value="${pr.nombre}">${pr.nombre}</option>`;
         }); 
         tb.innerHTML = h || "<tr><td colspan='4' class='text-center p-8'>Sin proveedores registrados</td></tr>";
-        
-        const p_prov = document.getElementById('p_prov');
-        const edit_prov = document.getElementById('edit_prov');
-        if (p_prov) p_prov.innerHTML = opts;
-        if (edit_prov) edit_prov.innerHTML = opts;
-
+        const p_prov = document.getElementById('p_prov'); const edit_prov = document.getElementById('edit_prov');
+        if (p_prov) p_prov.innerHTML = opts; if (edit_prov) edit_prov.innerHTML = opts;
     } catch (er) { tb.innerHTML = "<tr><td colspan='4' class='text-center p-8 text-red-500'>Error</td></tr>"; }
 };
 
@@ -710,125 +573,64 @@ window.eliminarProveedor = async (id) => {
 
 // 10. EDICIÓN, REGISTRO Y CARGA MASIVA
 window.guardarProducto = async () => {
-    const sku = document.getElementById('p_sku').value.trim(); 
-    const nom = document.getElementById('p_nom').value.trim(); 
-    const cat = document.getElementById('p_cat').value.trim() || "General";
-    const prov = document.getElementById('p_prov')?.value || ""; 
-    const cos = parseFloat(document.getElementById('p_cos').value) || 0; 
-    const pre = parseFloat(document.getElementById('p_pre').value) || 0; 
-    const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; 
-    const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; 
-    const stk = parseFloat(document.getElementById('p_stk').value) || 0; 
-    const minS = parseFloat(document.getElementById('p_min').value) || 0; 
-    const maxS = parseFloat(document.getElementById('p_max').value) || 0;
-    const isGranel = document.getElementById('p_granel').checked; 
-    const cad = document.getElementById('p_caducidad').value || null;
-
-    const z = document.getElementById('zonaSelect').value; 
-    const e = localStorage.getItem('empresaId'); 
-    const u = localStorage.getItem('currentUser'); 
-    const ts = Date.now(); 
-    const f = new Date(ts).toLocaleString('es-MX');
-    
+    const sku = document.getElementById('p_sku').value.trim(); const nom = document.getElementById('p_nom').value.trim(); const cat = document.getElementById('p_cat').value.trim() || "General";
+    const prov = document.getElementById('p_prov')?.value || ""; const cos = parseFloat(document.getElementById('p_cos').value) || 0; const pre = parseFloat(document.getElementById('p_pre').value) || 0; 
+    const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('p_stk').value) || 0; 
+    const minS = parseFloat(document.getElementById('p_min').value) || 0; const maxS = parseFloat(document.getElementById('p_max').value) || 0;
+    const isGranel = document.getElementById('p_granel').checked; const cad = document.getElementById('p_caducidad').value || null;
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX');
     if(!sku || !nom) return alert("SKU y Nombre obligatorios.");
-    
     try {
-        const r = `${e}_Inventario_${z}`; 
-        const d = await getDoc(doc(db, r, sku)); 
-        let sF = stk; if (d.exists()) sF += d.data().stock;
-        
+        const r = `${e}_Inventario_${z}`; const d = await getDoc(doc(db, r, sku)); let sF = stk; if (d.exists()) sF += d.data().stock;
         await setDoc(doc(db, r, sku), { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0 }, { merge: true }); 
         await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" });
-        
         window.mostrarNotificacion("📦 Producto ingresado correctamente"); 
         ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); 
-        if(document.getElementById('p_prov')) document.getElementById('p_prov').value = '';
-        document.getElementById('p_granel').checked = false; 
-        window.cargarInventarioGeneral();
+        if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; document.getElementById('p_granel').checked = false; window.cargarInventarioGeneral();
     } catch (err) { alert("Error al guardar producto."); }
 };
 
 window.abrirModalEdicion = (sku) => { 
     const p = window.inventarioLocal.find(x => x.sku === sku); if(!p) return;
-    document.getElementById('edit_sku').value = p.sku; 
-    document.getElementById('edit_nom').value = p.nombre; 
-    document.getElementById('edit_cat').value = p.categoria || "General";
-    
+    document.getElementById('edit_sku').value = p.sku; document.getElementById('edit_nom').value = p.nombre; document.getElementById('edit_cat').value = p.categoria || "General";
     if(document.getElementById('edit_prov')) document.getElementById('edit_prov').value = p.proveedor || "";
-    
-    document.getElementById('edit_cos').value = p.costo||0; 
-    document.getElementById('edit_pre').value = p.precio||0; 
-    document.getElementById('edit_promo').value = p.precio_promo || 0; 
-    document.getElementById('edit_mayoreo').value = p.precio_mayoreo || 0; 
-    document.getElementById('edit_cant_mayoreo').value = p.cant_mayoreo || 0; 
-    document.getElementById('edit_stk').value = p.stock||0; 
-    document.getElementById('edit_min').value = p.min_stk || 0; 
-    document.getElementById('edit_max').value = p.max_stk || 0;
-    document.getElementById('edit_granel').checked = p.es_granel || false; 
-    document.getElementById('edit_caducidad').value = p.caducidad || "";
-    document.getElementById('modalEdicion').classList.remove('hidden'); 
+    document.getElementById('edit_cos').value = p.costo||0; document.getElementById('edit_pre').value = p.precio||0; document.getElementById('edit_promo').value = p.precio_promo || 0; 
+    document.getElementById('edit_mayoreo').value = p.precio_mayoreo || 0; document.getElementById('edit_cant_mayoreo').value = p.cant_mayoreo || 0; document.getElementById('edit_stk').value = p.stock||0; 
+    document.getElementById('edit_min').value = p.min_stk || 0; document.getElementById('edit_max').value = p.max_stk || 0; document.getElementById('edit_granel').checked = p.es_granel || false; 
+    document.getElementById('edit_caducidad').value = p.caducidad || ""; document.getElementById('modalEdicion').classList.remove('hidden'); 
 };
 
 window.cerrarModalEdicion = () => { document.getElementById('modalEdicion').classList.add('hidden'); };
 
 window.guardarEdicionProducto = async () => {
-    const sku = document.getElementById('edit_sku').value; 
-    const nom = document.getElementById('edit_nom').value.trim(); 
-    const cat = document.getElementById('edit_cat').value.trim() || "General"; 
-    const prov = document.getElementById('edit_prov')?.value || ""; 
-    const cos = parseFloat(document.getElementById('edit_cos').value) || 0; 
-    const pre = parseFloat(document.getElementById('edit_pre').value) || 0; 
-    const promo = parseFloat(document.getElementById('edit_promo').value) || 0; 
-    const pMay = parseFloat(document.getElementById('edit_mayoreo').value) || 0; 
-    const cMay = parseFloat(document.getElementById('edit_cant_mayoreo').value) || 0; 
-    const stk = parseFloat(document.getElementById('edit_stk').value) || 0; 
-    const minS = parseFloat(document.getElementById('edit_min').value) || 0; 
-    const maxS = parseFloat(document.getElementById('edit_max').value) || 0;
-    const isGranel = document.getElementById('edit_granel').checked; 
-    const cad = document.getElementById('edit_caducidad').value || null;
-
+    const sku = document.getElementById('edit_sku').value; const nom = document.getElementById('edit_nom').value.trim(); const cat = document.getElementById('edit_cat').value.trim() || "General"; 
+    const prov = document.getElementById('edit_prov')?.value || ""; const cos = parseFloat(document.getElementById('edit_cos').value) || 0; const pre = parseFloat(document.getElementById('edit_pre').value) || 0; 
+    const promo = parseFloat(document.getElementById('edit_promo').value) || 0; const pMay = parseFloat(document.getElementById('edit_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('edit_cant_mayoreo').value) || 0; 
+    const stk = parseFloat(document.getElementById('edit_stk').value) || 0; const minS = parseFloat(document.getElementById('edit_min').value) || 0; const maxS = parseFloat(document.getElementById('edit_max').value) || 0;
+    const isGranel = document.getElementById('edit_granel').checked; const cad = document.getElementById('edit_caducidad').value || null;
     if(!nom) return alert("El nombre es obligatorio.");
-    
-    const z = document.getElementById('zonaSelect').value; 
-    const e = localStorage.getItem('empresaId'); 
-    const u = localStorage.getItem('currentUser'); 
-    const ts = Date.now(); 
-    const f = new Date(ts).toLocaleString('es-MX');
-    
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX');
     try {
         let updates = { nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_promo: promo, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: stk, min_stk: minS, max_stk: maxS, caducidad: cad };                
         await setDoc(doc(db, `${e}_Inventario_${z}`, sku), updates, { merge: true });
         await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "AJUSTE" });
-        
-        window.mostrarNotificacion("✅ Producto actualizado"); 
-        window.cerrarModalEdicion(); 
-        window.cargarInventarioGeneral();
+        window.mostrarNotificacion("✅ Producto actualizado"); window.cerrarModalEdicion(); window.cargarInventarioGeneral();
     } catch(err) { alert("Error al editar."); }
 };
 
 window.procesarArchivoMasivo = function() {
-    const i = document.getElementById('archivoInventario'); 
-    const s = document.getElementById('statusCargaMasiva'); 
-    const z = document.getElementById('zonaSelect').value; 
-    const e = localStorage.getItem('empresaId'); 
-    const u = localStorage.getItem('currentUser');
-    
-    if (!i.files || i.files.length === 0) return; 
-    const a = i.files[0]; const l = new FileReader();
+    const i = document.getElementById('archivoInventario'); const s = document.getElementById('statusCargaMasiva'); const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser');
+    if (!i.files || i.files.length === 0) return; const a = i.files[0]; const l = new FileReader();
     s.classList.remove('hidden'); s.className = "mt-4 p-4 bg-blue-50 text-blue-700 rounded-lg font-bold"; s.innerText = "⏳ Sincronizando...";
-    
     l.onload = async function(ev) {
         const c = ev.target.result; let pr = 0; const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX');
         try {
-            let batch = writeBatch(db); let opCount = 0; 
-            const commitBatch = async () => { if(opCount > 0) { await batch.commit(); batch = writeBatch(db); opCount = 0; } };
-            
+            let batch = writeBatch(db); let opCount = 0; const commitBatch = async () => { if(opCount > 0) { await batch.commit(); batch = writeBatch(db); opCount = 0; } };
             const procesarItem = async (sku, nom, stk, cos, pre) => {
                 batch.set(doc(db, `${e}_Inventario_${z}`, sku), { sku, nombre: nom, costo: cos, precio: pre, stock: stk, zona: z, categoria: "General", proveedor: "", min_stk: 0, max_stk: 0, precio_promo: 0, precio_mayoreo: 0, cant_mayoreo: 0, es_granel: false, caducidad: null }, {merge:true}); opCount++;
                 if(stk > 0) { batch.set(doc(collection(db, `${e}_Historial_Ingresos`)), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); opCount++; }
                 if(opCount > 400) await commitBatch();
             };
-            
             if (a.name.endsWith('.xml')) {
                 const xm = new DOMParser().parseFromString(c, "text/xml"); const it = xm.getElementsByTagName("item");
                 for (let j = 0; j < it.length; j++) {
@@ -838,69 +640,33 @@ window.procesarArchivoMasivo = function() {
                     await procesarItem(sku, nom, stk, cos, pre); pr++;
                 }
             } else if (a.name.endsWith('.txt')) { 
-                const ln = c.split('\n'); 
-                for (let li of ln) { 
-                    const col = li.trim().split(','); 
-                    if (col.length >= 5 && col[0].trim()) { await procesarItem(col[0].trim(), col[1].trim(), parseFloat(col[4])||0, parseFloat(col[2])||0, parseFloat(col[3])||0); pr++; } 
-                } 
+                const ln = c.split('\n'); for (let li of ln) { const col = li.trim().split(','); if (col.length >= 5 && col[0].trim()) { await procesarItem(col[0].trim(), col[1].trim(), parseFloat(col[4])||0, parseFloat(col[2])||0, parseFloat(col[3])||0); pr++; } } 
             }
-            await commitBatch(); 
-            s.className = "mt-4 p-4 bg-green-50 text-green-700 rounded-lg font-bold"; 
-            s.innerText = `✅ Carga Exitosa! ${pr} productos cargados.`; 
-            window.cargarInventarioGeneral();
-        } catch (er) { 
-            s.className = "mt-4 p-4 bg-red-50 text-red-700 rounded-lg"; s.innerText = "❌ Error en archivo."; 
-        }
-    }; 
-    l.readAsText(a);
+            await commitBatch(); s.className = "mt-4 p-4 bg-green-50 text-green-700 rounded-lg font-bold"; s.innerText = `✅ Carga Exitosa! ${pr} productos cargados.`; window.cargarInventarioGeneral();
+        } catch (er) { s.className = "mt-4 p-4 bg-red-50 text-red-700 rounded-lg"; s.innerText = "❌ Error en archivo."; }
+    }; l.readAsText(a);
 };
 
 window.vaciarInventario = async () => { 
-    const z = document.getElementById('zonaSelect').value; 
-    const p = prompt(`Precaución. Escribe VACIAR para borrar toda la zona ${z}:`); 
-    if(p !== 'VACIAR') return; 
+    const z = document.getElementById('zonaSelect').value; const p = prompt(`Precaución. Escribe VACIAR para borrar toda la zona ${z}:`); if(p !== 'VACIAR') return; 
     try { 
-        const sn = await getDocs(collection(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`)); 
-        sn.forEach(async (d) => { await deleteDoc(doc(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`, d.id)); }); 
-        alert("Inventario borrado con éxito."); 
-        window.cargarInventarioGeneral(); 
+        const sn = await getDocs(collection(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`)); sn.forEach(async (d) => { await deleteDoc(doc(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`, d.id)); }); 
+        alert("Inventario borrado con éxito."); window.cargarInventarioGeneral(); 
     } catch(e) { alert("Error al borrar inventario."); } 
 };
 
 // 11. REPORTES Y KARDEX
 window.generarReporte = async () => {
-    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); 
-    const fIniStr = document.getElementById('rep_inicio').value; const fFinStr = document.getElementById('rep_fin').value; const fCat = document.getElementById('rep_cat').value;
-    
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const fIniStr = document.getElementById('rep_inicio').value; const fFinStr = document.getElementById('rep_fin').value; const fCat = document.getElementById('rep_cat').value;
     if(!fIniStr || !fFinStr) return alert("Selecciona fechas para generar el reporte.");
-    
-    const tInicio = new Date(fIniStr + "T00:00:00").getTime(); 
-    const tFin = new Date(fFinStr + "T23:59:59").getTime();
-    const tb = document.getElementById('tablaReportesBody'); 
-    tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Procesando ventas...</td></tr>"; 
-    
-    let totalDinero = 0; let cantVentas = 0; let cantTickets = 0; let h = ""; 
-    window.datosReporteCSV = [["Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; 
-    
+    const tInicio = new Date(fIniStr + "T00:00:00").getTime(); const tFin = new Date(fFinStr + "T23:59:59").getTime();
+    const tb = document.getElementById('tablaReportesBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Procesando ventas...</td></tr>"; 
+    let totalDinero = 0; let cantVentas = 0; let cantTickets = 0; let h = ""; window.datosReporteCSV = [["Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; 
     try {
-        const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); 
-        const vSn = await getDocs(qVentas); let ventasPeriodo = [];
-        vSn.forEach(d => { 
-            const v = d.data(); 
-            if(v.timestamp >= tInicio && v.timestamp <= tFin) { 
-                if(fCat === 'Todas' || v.categoria === fCat) { 
-                    ventasPeriodo.push(v); totalDinero += (v.precioVenta * v.cantidad); cantVentas += v.cantidad; 
-                } 
-            }
-        });
-        
-        const ticketsUnicos = new Set(ventasPeriodo.map(v => v.timestamp)); cantTickets = ticketsUnicos.size;
-        const tkPromedio = cantTickets > 0 ? (totalDinero / cantTickets) : 0;
-
-        document.getElementById('rep_total_vendido').innerText = `$${totalDinero.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; 
-        document.getElementById('rep_piezas_vendidas').innerText = cantVentas.toLocaleString(); 
-        document.getElementById('rep_ticket_promedio').innerText = `$${tkPromedio.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
-        
+        const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); let ventasPeriodo = [];
+        vSn.forEach(d => { const v = d.data(); if(v.timestamp >= tInicio && v.timestamp <= tFin) { if(fCat === 'Todas' || v.categoria === fCat) { ventasPeriodo.push(v); totalDinero += (v.precioVenta * v.cantidad); cantVentas += v.cantidad; } } });
+        const ticketsUnicos = new Set(ventasPeriodo.map(v => v.timestamp)); cantTickets = ticketsUnicos.size; const tkPromedio = cantTickets > 0 ? (totalDinero / cantTickets) : 0;
+        document.getElementById('rep_total_vendido').innerText = `$${totalDinero.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; document.getElementById('rep_piezas_vendidas').innerText = cantVentas.toLocaleString(); document.getElementById('rep_ticket_promedio').innerText = `$${tkPromedio.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
         ventasPeriodo.sort((a,b) => b.timestamp - a.timestamp);
         ventasPeriodo.forEach(v => {
             const sub = v.precioVenta * v.cantidad; const cV = v.cantidad % 1 !== 0 ? v.cantidad.toFixed(3) : v.cantidad;
@@ -912,8 +678,7 @@ window.generarReporte = async () => {
 };
 
 window.descargarCSV = () => { 
-    if(window.datosReporteCSV.length <= 1) return alert("Genera el reporte primero."); 
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+    if(window.datosReporteCSV.length <= 1) return alert("Genera el reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
     window.datosReporteCSV.forEach(function(rowArray) { let row = rowArray.map(item => `"${item}"`).join(","); csvContent += row + "\r\n"; });
     const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Reporte.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
 };
@@ -923,75 +688,35 @@ window.cargarKardex = async (tipo = 'entradas') => {
     document.getElementById('btn-kardex-entradas').className = tipo === 'entradas' ? 'px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition';
     document.getElementById('btn-kardex-salidas').className = tipo === 'salidas' ? 'px-4 py-2 font-bold text-red-600 border-b-4 border-red-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition';
     
-    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); 
-    const tb = document.getElementById('tablaKardexBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando base de datos...</td></tr>"; 
-    let movs = [];
-    
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaKardexBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando base de datos...</td></tr>"; let movs = [];
     try {
-        if (tipo === 'entradas') { 
-            const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); 
-            const iSn = await getDocs(qIngresos); 
-            iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); 
-        } else { 
-            const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); 
-            const vSn = await getDocs(qVentas); 
-            vSn.forEach(d => { movs.push({...d.data(), tipo: 'SALIDA'}); }); 
-        }
+        if (tipo === 'entradas') { const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); const iSn = await getDocs(qIngresos); iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); } 
+        else { const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); vSn.forEach(d => { movs.push({...d.data(), tipo: 'SALIDA'}); }); }
         
-        movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); 
-        const movsRecientes = movs.slice(0, 100); let h = "";
-        
+        movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); const movsRecientes = movs.slice(0, 100); let h = "";
         movsRecientes.forEach(m => {
-            let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; 
-            if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } 
-            if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } 
-            if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; }
-            if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; }
-            
-            const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad;
-            h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`;
-        }); 
-        tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>No hay movimientos registrados.</td></tr>`;
+            let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; } if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; }
+            const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad; h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`;
+        }); tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>No hay movimientos registrados.</td></tr>`;
     } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error al consultar Kardex</td></tr>`; }
 };
 
 // 12. USUARIOS Y ZONAS
 window.crearUsuarioSecundario = async () => { 
-    const u = document.getElementById('new_user').value.trim(); 
-    const em = document.getElementById('new_email').value.trim().toLowerCase(); 
-    const p = document.getElementById('new_pass').value.trim(); 
-    const r = document.getElementById('new_role').value; 
-    const emp = localStorage.getItem('empresaId'); 
-    const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); 
-    
+    const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; const emp = localStorage.getItem('empresaId'); const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); 
     if(!u || !p || !em) return alert("Llena todos los datos"); 
-    
     try { 
-        const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); 
-        const uid = cred.user.uid;
-        await secondaryAuth.signOut(); 
-        
-        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
-        await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: emp, rol: r, zonas: zn, usuario: u }); 
-        
-        alert(`✅ Usuario creado con éxito.`); 
-        ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); 
-        window.cargarUsuarios(); 
+        const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); 
+        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: emp, rol: r, zonas: zn, usuario: u }); 
+        alert(`✅ Usuario creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); 
     } catch(er) { alert("Error al crear usuario: " + er.message); } 
 };
 
 window.cargarUsuarios = async () => { 
-    const e = localStorage.getItem('empresaId'); 
-    const tb = document.getElementById('tablaUsuariosBody'); 
-    tb.innerHTML = '<tr><td colspan="3" class="text-center p-8">Cargando...</td></tr>'; 
-    
+    const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaUsuariosBody'); tb.innerHTML = '<tr><td colspan="3" class="text-center p-8">Cargando...</td></tr>'; 
     try { 
-        const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); 
-        const sn = await getDocs(q); let h = ''; 
-        sn.forEach(d => { 
-            const u = d.data(); 
-            h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${u.zonas.join(', ')}</td></tr>`; 
-        }); 
+        const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); const sn = await getDocs(q); let h = ''; 
+        sn.forEach(d => { const u = d.data(); h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${u.zonas.join(', ')}</td></tr>`; }); 
         tb.innerHTML = h || '<tr><td colspan="3" class="text-center p-8">Sin usuarios registrados</td></tr>'; 
     } catch(er) { tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error al cargar equipo</td></tr>`; } 
 };
@@ -999,112 +724,31 @@ window.cargarUsuarios = async () => {
 window.agregarNuevaZona = async () => { 
     const nZ = prompt("Escribe el nombre exacto de la nueva zona:"); 
     if(nZ) { 
-        const u = localStorage.getItem('currentUser'); 
-        const z = JSON.parse(localStorage.getItem('zonas') || "[]"); 
-        
-        if(!z.includes(nZ)) { 
-            z.push(nZ); 
-            await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); 
-            localStorage.setItem('zonas', JSON.stringify(z)); 
-            alert("Zona agregada correctamente. La página se actualizará.");
-            location.reload();
-        } else {
-            alert("Esa zona ya existe en tu registro.");
-        }
+        const u = localStorage.getItem('currentUser'); const z = JSON.parse(localStorage.getItem('zonas') || "[]"); 
+        if(!z.includes(nZ)) { z.push(nZ); await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); localStorage.setItem('zonas', JSON.stringify(z)); alert("Zona agregada correctamente. La página se actualizará."); location.reload(); } else { alert("Esa zona ya existe en tu registro."); }
     } 
 };
 
 // 13. INICIO AUTOMÁTICO
-if(localStorage.getItem('currentUser')) {
-    iniciarApp();
-}
+if(localStorage.getItem('currentUser')) { iniciarApp(); }
 
-// ==========================================
 // REGISTRO RÁPIDO EN PUNTO DE VENTA
-// ==========================================
 window.abrirModalRegistroRapido = () => {
-    const busquedaActual = document.getElementById('venta_busqueda').value;
-    
-    document.getElementById('rr_sku').value = busquedaActual.trim();
-    document.getElementById('rr_nombre').value = '';
-    document.getElementById('rr_costo').value = '';
-    document.getElementById('rr_precio').value = '';
-    
-    document.getElementById('modal-registro-rapido').classList.remove('hidden');
-    
-    if(busquedaActual !== "") {
-        document.getElementById('rr_nombre').focus();
-    } else {
-        document.getElementById('rr_sku').focus();
-    }
+    const busquedaActual = document.getElementById('venta_busqueda').value; document.getElementById('rr_sku').value = busquedaActual.trim(); document.getElementById('rr_nombre').value = ''; document.getElementById('rr_costo').value = ''; document.getElementById('rr_precio').value = ''; document.getElementById('modal-registro-rapido').classList.remove('hidden');
+    if(busquedaActual !== "") { document.getElementById('rr_nombre').focus(); } else { document.getElementById('rr_sku').focus(); }
 };
 
-window.cerrarModalRegistroRapido = () => {
-    document.getElementById('modal-registro-rapido').classList.add('hidden');
-    document.getElementById('venta_busqueda').focus(); 
-};
+window.cerrarModalRegistroRapido = () => { document.getElementById('modal-registro-rapido').classList.add('hidden'); document.getElementById('venta_busqueda').focus(); };
 
 window.guardarRegistroRapido = async () => {
-    const sku = document.getElementById('rr_sku').value.trim();
-    const nom = document.getElementById('rr_nombre').value.trim().toUpperCase();
-    const cos = parseFloat(document.getElementById('rr_costo').value) || 0;
-    const pre = parseFloat(document.getElementById('rr_precio').value) || 0;
-
-    if (!sku || !nom || pre <= 0) {
-        return alert('Por favor, ingresa SKU, Nombre y un Precio de Venta válido (mayor a 0).');
-    }
-
-    const z = document.getElementById('zonaSelect').value; 
-    const e = localStorage.getItem('empresaId'); 
-    const u = localStorage.getItem('currentUser'); 
-    const ts = Date.now(); 
-    const f = new Date(ts).toLocaleString('es-MX');
-
-    const btn = document.querySelector('#modal-registro-rapido button[onclick="guardarRegistroRapido()"]');
-    const btnOriginalText = btn.innerHTML;
-    btn.innerHTML = '⏳ Guardando...';
-    btn.disabled = true;
-
+    const sku = document.getElementById('rr_sku').value.trim(); const nom = document.getElementById('rr_nombre').value.trim().toUpperCase(); const cos = parseFloat(document.getElementById('rr_costo').value) || 0; const pre = parseFloat(document.getElementById('rr_precio').value) || 0;
+    if (!sku || !nom || pre <= 0) { return alert('Por favor, ingresa SKU, Nombre y un Precio de Venta válido (mayor a 0).'); }
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX');
+    const btn = document.querySelector('#modal-registro-rapido button[onclick="guardarRegistroRapido()"]'); const btnOriginalText = btn.innerHTML; btn.innerHTML = '⏳ Guardando...'; btn.disabled = true;
     try {
-        const nuevoProducto = { 
-            sku: sku, 
-            nombre: nom, 
-            categoria: "General", 
-            proveedor: "", 
-            costo: cos, 
-            precio: pre, 
-            precio_mayoreo: 0, 
-            cant_mayoreo: 0, 
-            es_granel: false, 
-            stock: 0, 
-            min_stk: 0, 
-            max_stk: 0, 
-            caducidad: null, 
-            zona: z, 
-            precio_promo: 0 
-        };
-
-        const r = `${e}_Inventario_${z}`; 
-        await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); 
-        await addDoc(collection(db, `${e}_Historial_Ingresos`), { 
-            sku: sku, nombre: nom, cantidad: 0, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA_EXPRESS" 
-        });
-
-        window.inventarioLocal.push(nuevoProducto);
-
-        window.cerrarModalRegistroRapido();
-        document.getElementById('venta_busqueda').value = '';
-        
-        const productoParaCarrito = { ...nuevoProducto, stock: 9999 };
-        window.agregarAlCarrito(productoParaCarrito);
-        
-        window.mostrarNotificacion('✅ Producto express guardado y listo para cobro.');
-        
-    } catch (error) {
-        console.error(error);
-        alert('Hubo un error al registrar el producto en la base de datos.');
-    } finally {
-        btn.innerHTML = btnOriginalText;
-        btn.disabled = false;
-    }
+        const nuevoProducto = { sku: sku, nombre: nom, categoria: "General", proveedor: "", costo: cos, precio: pre, precio_mayoreo: 0, cant_mayoreo: 0, es_granel: false, stock: 0, min_stk: 0, max_stk: 0, caducidad: null, zona: z, precio_promo: 0 };
+        const r = `${e}_Inventario_${z}`; await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku: sku, nombre: nom, cantidad: 0, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA_EXPRESS" });
+        window.inventarioLocal.push(nuevoProducto); window.cerrarModalRegistroRapido(); document.getElementById('venta_busqueda').value = '';
+        const productoParaCarrito = { ...nuevoProducto, stock: 9999 }; window.agregarAlCarrito(productoParaCarrito); window.mostrarNotificacion('✅ Producto express guardado y listo para cobro.');
+    } catch (error) { alert('Hubo un error al registrar el producto en la base de datos.'); } finally { btn.innerHTML = btnOriginalText; btn.disabled = false; }
 };
