@@ -27,11 +27,12 @@ window.kardexActual = 'entradas';
 window.datosReporteCSV = [];
 window.categoriasUnicas = new Set(); 
 
+// SISTEMA DE NOTIFICACIONES ELEGANTES
 window.mostrarNotificacion = (mensaje) => {
     try { const beep = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg'); beep.volume = 0.5; beep.play(); } catch(e) {}
     const cont = document.getElementById('toast-container'); const t = document.createElement('div');
     t.className = 'toast'; t.innerText = mensaje; cont.appendChild(t);
-    setTimeout(() => { if(t.parentNode) t.parentNode.removeChild(t); }, 2000);
+    setTimeout(() => { if(t.parentNode) t.parentNode.removeChild(t); }, 2500);
 };
 
 window.toggleAuth = () => { 
@@ -63,7 +64,6 @@ window.cambiarPestaña = (idTab) => {
     if(idTab === 'tab-agotados') window.renderAgotados();
     if(idTab === 'tab-proveedores') window.cargarProveedores();
     
-    // AUTO-GENERAR REPORTES HOY Y TOTAL STOCK (Forzando Zona Horaria Local)
     if(idTab === 'tab-reportes') {
         const f = new Date();
         const hoy = f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0');
@@ -96,37 +96,37 @@ window.registrarNegocio = async () => {
     const u = document.getElementById('regUser').value.trim(); 
     const em = document.getElementById('regEmail').value.trim().toLowerCase(); 
     const p = document.getElementById('regPass').value.trim();
-    if(!e || !z || !u || !em || !p) return alert("Llena todos los campos."); 
+    if(!e || !z || !u || !em || !p) return window.mostrarNotificacion("⚠️ Llena todos los campos."); 
     btn.innerText = "Creando base de datos..."; btn.disabled = true;
     try { 
         const cred = await createUserWithEmailAndPassword(auth, em, p); const uid = cred.user.uid; 
         await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
         await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: e.replace(/\s+/g, ''), zonas: [z], rol: "Dueño", usuario: u }); 
-        alert("Negocio creado. Inicia sesión."); window.toggleAuth(); 
-    } catch (er) { alert("Error: " + er.message); } finally { btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; }
+        window.mostrarNotificacion("✅ Negocio creado. Inicia sesión."); window.toggleAuth(); 
+    } catch (er) { window.mostrarNotificacion("❌ Error: " + er.message); } finally { btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; }
 };
 
 window.iniciarSesion = async () => { 
     const btn = document.getElementById('btnLogin'); const u = document.getElementById('loginUser').value.trim(); const p = document.getElementById('loginPass').value.trim();
-    if(!u || !p) return alert("Faltan datos"); btn.innerText = "Conectando..."; btn.disabled = true;
+    if(!u || !p) return window.mostrarNotificacion("⚠️ Faltan datos."); btn.innerText = "Conectando..."; btn.disabled = true;
     try {
         const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); 
-        if(!dirDoc.exists()) { btn.innerText = "Entrar"; btn.disabled = false; return alert("Usuario no encontrado."); }
+        if(!dirDoc.exists()) { btn.innerText = "Entrar"; btn.disabled = false; return window.mostrarNotificacion("❌ Usuario no encontrado."); }
         const cred = await signInWithEmailAndPassword(auth, dirDoc.data().email, p); const uid = cred.user.uid; const userDoc = await getDoc(doc(db, "SaaS_Usuarios", uid));
         if (userDoc.exists()) { 
             const d = userDoc.data(); localStorage.setItem('currentUser', u); localStorage.setItem('empresaId', d.empresaId); 
             localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); localStorage.setItem('userRol', d.rol || "Vendedor"); 
             iniciarApp(); 
         }
-    } catch (er) { alert("Contraseña incorrecta o error de conexión."); } finally { btn.innerText = "Entrar"; btn.disabled = false; }
+    } catch (er) { window.mostrarNotificacion("❌ Contraseña incorrecta."); } finally { btn.innerText = "Entrar"; btn.disabled = false; }
 };
 
 window.recuperarPassword = async () => { 
     const u = prompt("Ingresa tu Usuario:"); if(!u) return; 
     try { 
-        const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) return alert("No existe el usuario."); 
-        await sendPasswordResetEmail(auth, dirDoc.data().email); alert(`Enlace enviado al correo registrado.`); 
-    } catch(e) { alert("Error al enviar el enlace."); } 
+        const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) return window.mostrarNotificacion("❌ No existe el usuario."); 
+        await sendPasswordResetEmail(auth, dirDoc.data().email); window.mostrarNotificacion(`✅ Enlace enviado al correo.`); 
+    } catch(e) { window.mostrarNotificacion("❌ Error al enviar enlace."); } 
 };
 
 window.cerrarSesion = () => { localStorage.clear(); location.reload(); };
@@ -165,9 +165,9 @@ window.iniciarCamara = (m) => {
         window.detenerCamara(m); if (navigator.vibrate) navigator.vibrate(100); 
         if(m === 'ventas') { 
             const p = window.inventarioLocal.find(x => x.sku === decodedText); 
-            if(p) { window.agregarAlCarrito(p); } else { document.getElementById('venta_busqueda').value = decodedText; window.abrirModalRegistroRapido(); window.mostrarNotificacion("⚠️ Nuevo producto detectado."); }
+            if(p) { window.agregarAlCarrito(p); } else { document.getElementById('venta_busqueda').value = decodedText; window.abrirModalRegistroRapido(); window.mostrarNotificacion("⚠️ Nuevo producto. Regístralo."); }
         } else { document.getElementById('p_sku').value = decodedText; }
-    }, (e) => { }).catch(err => { alert("Cámara no soportada."); });
+    }, (e) => { }).catch(err => { window.mostrarNotificacion("❌ Cámara no soportada."); });
 };
 
 window.detenerCamara = (m) => { 
@@ -221,7 +221,7 @@ window.eliminarProducto = async (sku) => {
     try {
         const pRef = doc(db, `${e}_Inventario_${z}`, sku); const pSnap = await getDoc(pRef);
         if(pSnap.exists()) { await deleteDoc(pRef); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: pSnap.data().nombre, cantidad: pSnap.data().stock, zona: z, usuario: u, fechaRegistro: new Date().toLocaleString('es-MX'), timestamp: Date.now(), tipoMovimiento: "ELIMINACIÓN" }); window.mostrarNotificacion("🗑️ Producto eliminado correctamente"); window.cargarInventarioGeneral(); }
-    } catch(er) { alert("Ocurrió un error."); }
+    } catch(er) { window.mostrarNotificacion("❌ Ocurrió un error."); }
 };
 
 window.filtrarProductosVenta = () => {
@@ -277,7 +277,7 @@ window.renderCarrito = () => {
 };
 
 window.procesarVentaCompleta = async () => {
-    if (window.carrito.length === 0) return alert("El carrito está vacío.");
+    if (window.carrito.length === 0) return window.mostrarNotificacion("⚠️ El carrito está vacío.");
     const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando...";
     const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0; 
     try {
@@ -288,7 +288,7 @@ window.procesarVentaCompleta = async () => {
         }
         window.carrito = []; window.renderCarrito(); window.cargarInventarioGeneral(); 
         btn.disabled = false; btn.innerText = "✅ Cobrar"; window.mostrarNotificacion("✅ Venta registrada"); 
-    } catch(er) { alert("Ocurrió un error."); btn.disabled = false; btn.innerText = "✅ Cobrar"; } 
+    } catch(er) { window.mostrarNotificacion("❌ Ocurrió un error."); btn.disabled = false; btn.innerText = "✅ Cobrar"; } 
 };
 
 // 8. MÓDULO ÓRDENES DE COMPRA
@@ -324,7 +324,7 @@ window.abrirPestañaOrden = () => {
 
 window.generarOrdenCompra = () => {
     let faltantes = window.inventarioLocal.filter(p => parseFloat(p.stock) <= (parseFloat(p.min_stk) || 0));
-    if(faltantes.length === 0) return alert("✅ Todo el inventario está por encima del mínimo.");
+    if(faltantes.length === 0) return window.mostrarNotificacion("✅ Todo el inventario está por encima del mínimo.");
     window.ordenCompraActual = faltantes.map(p => { let sugerido = (parseFloat(p.max_stk) || 0) > 0 ? (parseFloat(p.max_stk) - parseFloat(p.stock)) : 1; if (sugerido < 0) sugerido = 0; return { ...p, pedir: sugerido }; });
     window.cambiarPestaña('tab-orden'); window.renderTabOrdenCompra();
 };
@@ -336,7 +336,6 @@ window.renderTabOrdenCompra = () => {
     window.ordenCompraActual.forEach((p, idx) => {
         let subCosto = (parseFloat(p.costo) || 0) * (parseFloat(p.pedir) || 0); totalCosto += subCosto;
         const stockActualStr = p.stock % 1 !== 0 ? parseFloat(p.stock).toFixed(2) : p.stock; const provStr = p.proveedor ? `🚚 ${p.proveedor}` : '📁 Sin Proveedor Asignado';
-        
         h += `
         <div class="bg-white p-4 rounded-2xl shadow-sm border-2 border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div class="flex-1 w-full">
@@ -373,7 +372,7 @@ window.actualizarCantOrden = (idx, val) => {
 window.enviarOrdenWhatsApp = () => {
     const e = localStorage.getItem('empresaId'); const z = document.getElementById('zonaSelect').value;
     let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); 
-    if(filterPedir.length === 0) return alert("No hay productos con cantidad a pedir. Escribe artículos a pedir en las cajas de texto.");
+    if(filterPedir.length === 0) return window.mostrarNotificacion("⚠️ No hay productos para pedir.");
     let textoMensaje = `📋 *NUEVA ORDEN DE COMPRA*\n🏢 *Negocio:* ${e}\n📍 *Sucursal:* ${z}\n\n*Productos solicitados:*\n`; let totalCosto = 0;
     filterPedir.forEach(p => { let subCosto = (parseFloat(p.costo) || 0) * p.pedir; totalCosto += subCosto; textoMensaje += `📦 ${p.pedir} x ${String(p.nombre).substring(0,25)}\n`; });
     textoMensaje += `\n💰 *Total Estimado:* $${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
@@ -384,19 +383,19 @@ window.enviarOrdenWhatsApp = () => {
 window.guardarProveedor = async () => {
     const nom = document.getElementById('prov_nombre').value.trim(); const tel = document.getElementById('prov_tel').value.trim(); const not = document.getElementById('prov_notas').value.trim(); const e = localStorage.getItem('empresaId');
     let dias = []; document.querySelectorAll('.prov_dia:checked').forEach(c => dias.push(c.value));
-    if(!nom) return alert("Nombre obligatorio.");
-    try { const id = nom.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); await setDoc(doc(db, `${e}_Proveedores`, id), { id, nombre: nom, telefono: tel, dias: dias, notas: not, timestamp: Date.now() }); window.mostrarNotificacion("✅ Proveedor guardado"); document.getElementById('prov_nombre').value = ''; document.getElementById('prov_tel').value = ''; document.getElementById('prov_notas').value = ''; document.querySelectorAll('.prov_dia').forEach(c => c.checked = false); window.cargarProveedores(); } catch(er) { alert("Error al guardar proveedor."); }
+    if(!nom) return window.mostrarNotificacion("⚠️ El nombre es obligatorio.");
+    try { const id = nom.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); await setDoc(doc(db, `${e}_Proveedores`, id), { id, nombre: nom, telefono: tel, dias: dias, notas: not, timestamp: Date.now() }); window.mostrarNotificacion("✅ Proveedor guardado"); document.getElementById('prov_nombre').value = ''; document.getElementById('prov_tel').value = ''; document.getElementById('prov_notas').value = ''; document.querySelectorAll('.prov_dia').forEach(c => c.checked = false); window.cargarProveedores(); } catch(er) { window.mostrarNotificacion("❌ Error al guardar proveedor."); }
 };
 window.cargarProveedores = async () => {
     const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaProveedoresBody'); tb.innerHTML = "<tr><td colspan='4' class='text-center p-8'>Cargando...</td></tr>"; let h = ""; let opts = '<option value="">Seleccionar Proveedor...</option>'; 
     try { const sn = await getDocs(collection(db, `${e}_Proveedores`)); sn.forEach(d => { const pr = d.data(); const diasStr = pr.dias.length > 0 ? pr.dias.join(', ') : 'Llamada previa'; h += `<tr class="border-b"><td class="p-3"><span class="font-bold text-teal-700 block">${pr.nombre}</span><span class="text-xs text-gray-500">📞 ${pr.telefono||'Sin Tel'}</span></td><td class="p-3 text-sm font-bold">${diasStr}</td><td class="p-3 text-xs text-gray-600 whitespace-pre-wrap">${pr.notas}</td><td class="p-3"><button onclick="eliminarProveedor('${pr.id}')" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded transition">🗑️</button></td></tr>`; opts += `<option value="${pr.nombre}">${pr.nombre}</option>`; }); tb.innerHTML = h || "<tr><td colspan='4' class='text-center p-8'>Sin proveedores registrados</td></tr>"; const p_prov = document.getElementById('p_prov'); const edit_prov = document.getElementById('edit_prov'); if (p_prov) p_prov.innerHTML = opts; if (edit_prov) edit_prov.innerHTML = opts; } catch (er) { tb.innerHTML = "<tr><td colspan='4' class='text-center p-8 text-red-500'>Error</td></tr>"; }
 };
-window.eliminarProveedor = async (id) => { if(!confirm("¿Borrar este proveedor?")) return; const e = localStorage.getItem('empresaId'); try { await deleteDoc(doc(db, `${e}_Proveedores`, id)); window.cargarProveedores(); } catch(er) { alert("Error."); } };
+window.eliminarProveedor = async (id) => { if(!confirm("¿Borrar este proveedor?")) return; const e = localStorage.getItem('empresaId'); try { await deleteDoc(doc(db, `${e}_Proveedores`, id)); window.cargarProveedores(); } catch(er) { window.mostrarNotificacion("❌ Ocurrió un error."); } };
 
 // 10. EDICIÓN, REGISTRO Y CARGA MASIVA
 window.guardarProducto = async () => {
-    const sku = document.getElementById('p_sku').value.trim(); const nom = document.getElementById('p_nom').value.trim(); const cat = document.getElementById('p_cat').value.trim() || "General"; const prov = document.getElementById('p_prov')?.value || ""; const cos = parseFloat(document.getElementById('p_cos').value) || 0; const pre = parseFloat(document.getElementById('p_pre').value) || 0; const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('p_stk').value) || 0; const minS = parseFloat(document.getElementById('p_min').value) || 0; const maxS = parseFloat(document.getElementById('p_max').value) || 0; const isGranel = document.getElementById('p_granel').checked; const cad = document.getElementById('p_caducidad').value || null; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); if(!sku || !nom) return alert("SKU y Nombre obligatorios.");
-    try { const r = `${e}_Inventario_${z}`; const d = await getDoc(doc(db, r, sku)); let sF = stk; if (d.exists()) sF += d.data().stock; await setDoc(doc(db, r, sku), { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0 }, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); window.mostrarNotificacion("📦 Producto ingresado correctamente"); ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; document.getElementById('p_granel').checked = false; window.cargarInventarioGeneral(); } catch (err) { alert("Error al guardar producto."); }
+    const sku = document.getElementById('p_sku').value.trim(); const nom = document.getElementById('p_nom').value.trim(); const cat = document.getElementById('p_cat').value.trim() || "General"; const prov = document.getElementById('p_prov')?.value || ""; const cos = parseFloat(document.getElementById('p_cos').value) || 0; const pre = parseFloat(document.getElementById('p_pre').value) || 0; const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('p_stk').value) || 0; const minS = parseFloat(document.getElementById('p_min').value) || 0; const maxS = parseFloat(document.getElementById('p_max').value) || 0; const isGranel = document.getElementById('p_granel').checked; const cad = document.getElementById('p_caducidad').value || null; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); if(!sku || !nom) return window.mostrarNotificacion("⚠️ SKU y Nombre obligatorios.");
+    try { const r = `${e}_Inventario_${z}`; const d = await getDoc(doc(db, r, sku)); let sF = stk; if (d.exists()) sF += d.data().stock; await setDoc(doc(db, r, sku), { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0 }, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); window.mostrarNotificacion("📦 Producto ingresado correctamente"); ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; document.getElementById('p_granel').checked = false; window.cargarInventarioGeneral(); } catch (err) { window.mostrarNotificacion("❌ Error al guardar producto."); }
 };
 window.abrirModalEdicion = (sku) => { 
     const p = window.inventarioLocal.find(x => x.sku === sku); if(!p) return;
@@ -404,8 +403,8 @@ window.abrirModalEdicion = (sku) => {
 };
 window.cerrarModalEdicion = () => { document.getElementById('modalEdicion').classList.add('hidden'); };
 window.guardarEdicionProducto = async () => {
-    const sku = document.getElementById('edit_sku').value; const nom = document.getElementById('edit_nom').value.trim(); const cat = document.getElementById('edit_cat').value.trim() || "General"; const prov = document.getElementById('edit_prov')?.value || ""; const cos = parseFloat(document.getElementById('edit_cos').value) || 0; const pre = parseFloat(document.getElementById('edit_pre').value) || 0; const promo = parseFloat(document.getElementById('edit_promo').value) || 0; const pMay = parseFloat(document.getElementById('edit_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('edit_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('edit_stk').value) || 0; const minS = parseFloat(document.getElementById('edit_min').value) || 0; const maxS = parseFloat(document.getElementById('edit_max').value) || 0; const isGranel = document.getElementById('edit_granel').checked; const cad = document.getElementById('edit_caducidad').value || null; if(!nom) return alert("El nombre es obligatorio."); const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX');
-    try { let updates = { nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_promo: promo, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: stk, min_stk: minS, max_stk: maxS, caducidad: cad }; await setDoc(doc(db, `${e}_Inventario_${z}`, sku), updates, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "AJUSTE" }); window.mostrarNotificacion("✅ Producto actualizado"); window.cerrarModalEdicion(); window.cargarInventarioGeneral(); } catch(err) { alert("Error al editar."); }
+    const sku = document.getElementById('edit_sku').value; const nom = document.getElementById('edit_nom').value.trim(); const cat = document.getElementById('edit_cat').value.trim() || "General"; const prov = document.getElementById('edit_prov')?.value || ""; const cos = parseFloat(document.getElementById('edit_cos').value) || 0; const pre = parseFloat(document.getElementById('edit_pre').value) || 0; const promo = parseFloat(document.getElementById('edit_promo').value) || 0; const pMay = parseFloat(document.getElementById('edit_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('edit_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('edit_stk').value) || 0; const minS = parseFloat(document.getElementById('edit_min').value) || 0; const maxS = parseFloat(document.getElementById('edit_max').value) || 0; const isGranel = document.getElementById('edit_granel').checked; const cad = document.getElementById('edit_caducidad').value || null; if(!nom) return window.mostrarNotificacion("⚠️ El nombre es obligatorio."); const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX');
+    try { let updates = { nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_promo: promo, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: stk, min_stk: minS, max_stk: maxS, caducidad: cad }; await setDoc(doc(db, `${e}_Inventario_${z}`, sku), updates, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "AJUSTE" }); window.mostrarNotificacion("✅ Producto actualizado"); window.cerrarModalEdicion(); window.cargarInventarioGeneral(); } catch(err) { window.mostrarNotificacion("❌ Error al guardar cambios."); }
 };
 window.procesarArchivoMasivo = function() {
     const i = document.getElementById('archivoInventario'); const s = document.getElementById('statusCargaMasiva'); const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); if (!i.files || i.files.length === 0) return; const a = i.files[0]; const l = new FileReader(); s.classList.remove('hidden'); s.className = "mt-4 p-4 bg-blue-50 text-blue-700 rounded-lg font-bold"; s.innerText = "⏳ Sincronizando...";
@@ -414,17 +413,16 @@ window.procesarArchivoMasivo = function() {
             if (a.name.endsWith('.xml')) { const xm = new DOMParser().parseFromString(c, "text/xml"); const it = xm.getElementsByTagName("item"); for (let j = 0; j < it.length; j++) { const item = it[j]; const sku = item.getElementsByTagName("value0")[0]?.textContent?.trim() || ""; if (!sku) continue; const nom = item.getElementsByTagName("value1")[0]?.textContent?.trim() || ""; const stk = parseFloat(item.getElementsByTagName("value2")[0]?.textContent?.trim() || "0"); const nC = item.getElementsByTagName("value3")[0]?.textContent?.trim() || ""; let cos = 0; let pre = 0; if(nC) { const p = nC.split('?'); const eN = (str) => { const m = str.match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : 0; }; cos = eN(p[0]); pre = p.length > 1 ? eN(p[1]) : cos; if (pre === 0) pre = cos; } await procesarItem(sku, nom, stk, cos, pre); pr++; } } else if (a.name.endsWith('.txt')) { const ln = c.split('\n'); for (let li of ln) { const col = li.trim().split(','); if (col.length >= 5 && col[0].trim()) { await procesarItem(col[0].trim(), col[1].trim(), parseFloat(col[4])||0, parseFloat(col[2])||0, parseFloat(col[3])||0); pr++; } } } await commitBatch(); s.className = "mt-4 p-4 bg-green-50 text-green-700 rounded-lg font-bold"; s.innerText = `✅ Carga Exitosa! ${pr} productos cargados.`; window.cargarInventarioGeneral(); } catch (er) { s.className = "mt-4 p-4 bg-red-50 text-red-700 rounded-lg"; s.innerText = "❌ Error en archivo."; }
     }; l.readAsText(a);
 };
-window.vaciarInventario = async () => { const z = document.getElementById('zonaSelect').value; const p = prompt(`Precaución. Escribe VACIAR para borrar toda la zona ${z}:`); if(p !== 'VACIAR') return; try { const sn = await getDocs(collection(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`)); sn.forEach(async (d) => { await deleteDoc(doc(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`, d.id)); }); alert("Inventario borrado con éxito."); window.cargarInventarioGeneral(); } catch(e) { alert("Error al borrar inventario."); } };
+window.vaciarInventario = async () => { const z = document.getElementById('zonaSelect').value; const p = prompt(`Precaución. Escribe VACIAR para borrar toda la zona ${z}:`); if(p !== 'VACIAR') return; try { const sn = await getDocs(collection(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`)); sn.forEach(async (d) => { await deleteDoc(doc(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`, d.id)); }); window.mostrarNotificacion("✅ Inventario borrado."); window.cargarInventarioGeneral(); } catch(e) { window.mostrarNotificacion("❌ Error al borrar inventario."); } };
 
 // 11. REPORTES Y KARDEX
 window.generarReporte = async () => {
     const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const fIniStr = document.getElementById('rep_inicio').value; const fFinStr = document.getElementById('rep_fin').value; const fCat = document.getElementById('rep_cat').value;
-    if(!fIniStr || !fFinStr) return alert("Selecciona fechas para generar el reporte.");
+    if(!fIniStr || !fFinStr) return window.mostrarNotificacion("⚠️ Selecciona un rango de fechas.");
     const tInicio = new Date(fIniStr + "T00:00:00").getTime(); const tFin = new Date(fFinStr + "T23:59:59").getTime();
     const tb = document.getElementById('tablaReportesBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Procesando ventas...</td></tr>"; 
     let totalDinero = 0; let cantVentas = 0; let cantTickets = 0; let h = ""; window.datosReporteCSV = [["Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; 
     
-    // CÁLCULO DEL VALOR TOTAL EN STOCK (Basado en el Costo)
     let valorStockInfo = 0;
     window.inventarioLocal.forEach(p => { if(p.stock > 0) { valorStockInfo += (parseFloat(p.costo) || 0) * p.stock; } });
     const elStock = document.getElementById('rep_valor_stock'); if(elStock) elStock.innerText = `$${valorStockInfo.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
@@ -445,7 +443,7 @@ window.generarReporte = async () => {
 };
 
 window.descargarCSV = () => { 
-    if(window.datosReporteCSV.length <= 1) return alert("Genera el reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
+    if(window.datosReporteCSV.length <= 1) return window.mostrarNotificacion("⚠️ Genera un reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; 
     window.datosReporteCSV.forEach(function(rowArray) { let row = rowArray.map(item => `"${item}"`).join(","); csvContent += row + "\r\n"; });
     const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Reporte.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
 };
@@ -466,29 +464,28 @@ window.cargarKardex = async (tipo = 'entradas') => {
 
 // 12. USUARIOS Y ZONAS
 window.crearUsuarioSecundario = async () => { 
-    const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; const emp = localStorage.getItem('empresaId'); const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!u || !p || !em) return alert("Llena todos los datos"); 
-    try { const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: emp, rol: r, zonas: zn, usuario: u }); alert(`✅ Usuario creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); } catch(er) { alert("Error al crear usuario: " + er.message); } 
+    const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; const emp = localStorage.getItem('empresaId'); const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); 
+    if(!u || !p || !em) return window.mostrarNotificacion("⚠️ Llena todos los datos"); 
+    try { 
+        const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); 
+        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: emp, rol: r, zonas: zn, usuario: u }); 
+        window.mostrarNotificacion(`✅ Usuario creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); 
+    } catch(er) { window.mostrarNotificacion("❌ Error: " + er.message); } 
 };
 
-// ESTE ES EL ESCUDO CONTRA ERRORES ROJOS EN LA TABLA DE USUARIOS
 window.cargarUsuarios = async () => { 
     const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaUsuariosBody'); tb.innerHTML = '<tr><td colspan="3" class="text-center p-8">Cargando...</td></tr>'; 
     try { 
         const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); const sn = await getDocs(q); let h = ''; 
         sn.forEach(d => { 
-            const u = d.data(); 
-            // El escudo: Si un usuario manual no tiene zona, no se rompe, solo dice "Sin zona"
-            const zonasStr = (u.zonas && Array.isArray(u.zonas)) ? u.zonas.join(', ') : 'Sin zona asignada';
+            const u = d.data(); const zonasStr = (u.zonas && Array.isArray(u.zonas)) ? u.zonas.join(', ') : 'Sin zona asignada';
             h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${zonasStr}</td></tr>`; 
         }); 
         tb.innerHTML = h || '<tr><td colspan="3" class="text-center p-8">Sin usuarios registrados</td></tr>'; 
-    } catch(er) { 
-        tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error al cargar equipo</td></tr>`; 
-        console.error("Error leyendo usuarios:", er);
-    } 
+    } catch(er) { tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error al cargar equipo</td></tr>`; console.error("Error leyendo usuarios:", er); } 
 };
 
-window.agregarNuevaZona = async () => { const nZ = prompt("Escribe el nombre exacto de la nueva zona:"); if(nZ) { const u = localStorage.getItem('currentUser'); const z = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!z.includes(nZ)) { z.push(nZ); await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); localStorage.setItem('zonas', JSON.stringify(z)); alert("Zona agregada correctamente. La página se actualizará."); location.reload(); } else { alert("Esa zona ya existe en tu registro."); } } };
+window.agregarNuevaZona = async () => { const nZ = prompt("Escribe el nombre exacto de la nueva zona:"); if(nZ) { const u = localStorage.getItem('currentUser'); const z = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!z.includes(nZ)) { z.push(nZ); await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); localStorage.setItem('zonas', JSON.stringify(z)); window.mostrarNotificacion("✅ Zona agregada correctamente."); setTimeout(() => { location.reload(); }, 1500); } else { window.mostrarNotificacion("⚠️ Esa zona ya existe."); } } };
 
 // 13. INICIO AUTOMÁTICO Y REGISTRO EXPRES
 if(localStorage.getItem('currentUser')) { iniciarApp(); }
@@ -497,12 +494,12 @@ window.abrirModalRegistroRapido = () => { const busquedaActual = document.getEle
 window.cerrarModalRegistroRapido = () => { document.getElementById('modal-registro-rapido').classList.add('hidden'); document.getElementById('venta_busqueda').focus(); };
 window.guardarRegistroRapido = async () => {
     const sku = document.getElementById('rr_sku').value.trim(); const nom = document.getElementById('rr_nombre').value.trim().toUpperCase(); const cos = parseFloat(document.getElementById('rr_costo').value) || 0; const pre = parseFloat(document.getElementById('rr_precio').value) || 0;
-    if (!sku || !nom || pre <= 0) { return alert('Por favor, ingresa SKU, Nombre y un Precio de Venta válido (mayor a 0).'); }
+    if (!sku || !nom || pre <= 0) { return window.mostrarNotificacion('⚠️ Datos inválidos en registro express.'); }
     const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX');
     const btn = document.querySelector('#modal-registro-rapido button[onclick="guardarRegistroRapido()"]'); const btnOriginalText = btn.innerHTML; btn.innerHTML = '⏳ Guardando...'; btn.disabled = true;
     try {
         const nuevoProducto = { sku: sku, nombre: nom, categoria: "General", proveedor: "", costo: cos, precio: pre, precio_mayoreo: 0, cant_mayoreo: 0, es_granel: false, stock: 0, min_stk: 0, max_stk: 0, caducidad: null, zona: z, precio_promo: 0 };
         const r = `${e}_Inventario_${z}`; await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku: sku, nombre: nom, cantidad: 0, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA_EXPRESS" });
-        window.inventarioLocal.push(nuevoProducto); window.cerrarModalRegistroRapido(); document.getElementById('venta_busqueda').value = ''; const productoParaCarrito = { ...nuevoProducto, stock: 9999 }; window.agregarAlCarrito(productoParaCarrito); window.mostrarNotificacion('✅ Producto express guardado y listo para cobro.');
-    } catch (error) { alert('Hubo un error al registrar el producto en la base de datos.'); } finally { btn.innerHTML = btnOriginalText; btn.disabled = false; }
+        window.inventarioLocal.push(nuevoProducto); window.cerrarModalRegistroRapido(); document.getElementById('venta_busqueda').value = ''; const productoParaCarrito = { ...nuevoProducto, stock: 9999 }; window.agregarAlCarrito(productoParaCarrito); window.mostrarNotificacion('✅ Producto express guardado.');
+    } catch (error) { window.mostrarNotificacion('❌ Error al registrar producto express.'); } finally { btn.innerHTML = btnOriginalText; btn.disabled = false; }
 };
