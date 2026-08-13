@@ -65,7 +65,6 @@
                 <button id="btnAgregarZona" onclick="agregarNuevaZona()" class="hidden p-2 text-xs bg-gray-100 font-bold rounded-xl">+ Nueva Zona</button>
             </div>
             <div class="flex items-center gap-4">
-                <!-- AQUÍ ESTABA EL ERROR: ESTA PIEZA FALTABA Y HACÍA QUE CHOCARA -->
                 <span id="displayUser" class="text-xs md:text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">--</span>
                 <button onclick="cerrarSesion()" class="text-xs font-bold text-red-600 hover:underline">Cerrar Sesión</button>
             </div>
@@ -76,7 +75,7 @@
             <button id="btn-tab-general" onclick="cambiarPestaña('tab-general')" class="px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📦 Inventario</button>
             <button id="btn-tab-registro" onclick="cambiarPestaña('tab-registro')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📥 Bodega</button>
             <button id="btn-tab-agotados" onclick="cambiarPestaña('tab-agotados')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">⚠️ Alertas Stock</button>
-            <button id="btn-tab-orden" onclick="cambiarPestaña('tab-orden')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📝 Lista de Pedido</button>
+            <button id="btn-tab-orden" onclick="abrirPestañaOrden()" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📝 Lista de Pedido</button>
             <button id="btn-tab-proveedores" onclick="cambiarPestaña('tab-proveedores')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">🚚 Proveedores</button>
             <button id="btn-tab-kardex" onclick="cambiarPestaña('tab-kardex')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📋 Kardex</button>
             <button id="btn-tab-reportes" onclick="cambiarPestaña('tab-reportes')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📈 Reportes</button>
@@ -172,7 +171,7 @@
                 </div>
             </div>
 
-            <!-- LISTA DE PEDIDO (TARJETAS GIGANTES) -->
+            <!-- LISTA DE PEDIDO (EDITABLE) -->
             <div id="tab-orden" class="tab-content hidden p-4 max-w-2xl mx-auto animate-fade-in">
                 <div class="bg-gradient-to-r from-emerald-500 to-green-600 p-5 rounded-2xl shadow-xl text-white mb-6 flex justify-between items-center">
                     <h2 class="text-2xl font-black">📝 Pedido</h2>
@@ -211,21 +210,28 @@
                 </div>
             </div>
 
-            <!-- REPORTES -->
+            <!-- REPORTES Y VALOR EN STOCK -->
             <div id="tab-reportes" class="tab-content hidden space-y-4 animate-fade-in">
                 <div class="bg-white p-4 rounded-2xl border space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                        <input type="date" id="rep_inicio" class="w-full p-2.5 border-2 rounded-xl text-xs">
-                        <input type="date" id="rep_fin" class="w-full p-2.5 border-2 rounded-xl text-xs">
-                        <select id="rep_cat" class="w-full p-2.5 border-2 rounded-xl text-xs bg-gray-50"></select>
-                        <div class="flex gap-1"><button onclick="generarReporte()" class="w-full bg-orange-500 text-white rounded-xl text-xs">Generar</button><button onclick="descargarCSV()" class="w-full bg-green-600 text-white rounded-xl text-xs">Excel</button></div>
+                        <input type="date" id="rep_inicio" class="w-full p-2.5 border-2 rounded-xl text-xs font-bold text-gray-600">
+                        <input type="date" id="rep_fin" class="w-full p-2.5 border-2 rounded-xl text-xs font-bold text-gray-600">
+                        <select id="rep_cat" class="w-full p-2.5 border-2 rounded-xl text-xs font-bold bg-gray-50 text-gray-700"></select>
+                        <div class="flex gap-1"><button onclick="generarReporte()" class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl text-xs shadow-md transition">Generar</button><button onclick="descargarCSV()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl text-xs shadow-md transition">Excel</button></div>
                     </div>
-                    <div class="grid grid-cols-3 gap-4">
-                        <div class="bg-orange-50 p-4 rounded-xl text-center"><span id="rep_total_vendido" class="text-xl font-black text-orange-700">$0.00</span></div>
-                        <div class="bg-green-50 p-4 rounded-xl text-center"><span id="rep_piezas_vendidas" class="text-xl font-black text-green-700">0</span></div>
-                        <div class="bg-indigo-50 p-4 rounded-xl text-center"><span id="rep_ticket_promedio" class="text-xl font-black text-indigo-700">$0.00</span></div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-2">
+                        <div class="bg-orange-50 p-4 rounded-xl text-center border border-orange-100"><span class="block text-[10px] font-bold text-orange-600 uppercase">Ventas / Ingresos</span><span id="rep_total_vendido" class="text-lg md:text-xl font-black text-orange-700">$0.00</span></div>
+                        <div class="bg-green-50 p-4 rounded-xl text-center border border-green-100"><span class="block text-[10px] font-bold text-green-600 uppercase">Piezas Vendidas</span><span id="rep_piezas_vendidas" class="text-lg md:text-xl font-black text-green-700">0</span></div>
+                        <div class="bg-indigo-50 p-4 rounded-xl text-center border border-indigo-100"><span class="block text-[10px] font-bold text-indigo-600 uppercase">Ticket Promedio</span><span id="rep_ticket_promedio" class="text-lg md:text-xl font-black text-indigo-700">$0.00</span></div>
+                        <!-- NUEVA TARJETA: Valor en Stock -->
+                        <div class="bg-blue-50 p-4 rounded-xl text-center border border-blue-100"><span class="block text-[10px] font-bold text-blue-600 uppercase">Valor en Stock (Costo)</span><span id="rep_valor_stock" class="text-lg md:text-xl font-black text-blue-700">$0.00</span></div>
                     </div>
-                    <table class="w-full text-left text-sm"><thead class="bg-gray-800 text-white"><tr><th class="p-3">Fecha</th><th class="p-3">Prod</th><th class="p-3">Cat</th><th class="p-3">Cant</th><th class="p-3">Vend.</th><th class="p-3 text-right">Total</th></tr></thead><tbody id="tablaReportesBody"></tbody></table>
+                    <div class="overflow-x-auto rounded-xl border">
+                        <table class="w-full border-collapse text-left text-sm">
+                            <thead class="bg-gray-800 text-white"><tr><th class="p-3">Fecha</th><th class="p-3">Prod</th><th class="p-3">Cat</th><th class="p-3">Cant</th><th class="p-3">Vend.</th><th class="p-3 text-right">Total</th></tr></thead>
+                            <tbody id="tablaReportesBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -248,9 +254,31 @@
         </main>
     </div>
 
-    <!-- MODALES -->
+    <!-- MODAL DE EDICIÓN (CON ETIQUETAS) -->
     <div id="modalEdicion" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
-        <div class="bg-white p-6 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto"><h2 class="text-xl font-black border-b pb-2">✏️ Editar</h2><div class="grid grid-cols-2 gap-3 mt-3"><input type="text" id="edit_sku" class="p-2 border rounded" disabled><input type="text" id="edit_nom" class="p-2 border rounded"><input type="text" id="edit_cat" class="p-2 border rounded"><select id="edit_prov" class="p-2 border rounded"></select><input type="number" id="edit_cos" class="p-2 border rounded"><input type="number" id="edit_pre" class="p-2 border rounded"><input type="number" id="edit_promo" class="p-2 border rounded"><input type="number" id="edit_mayoreo" class="p-2 border rounded"><input type="number" id="edit_cant_mayoreo" class="p-2 border rounded"><input type="number" id="edit_stk" class="p-2 border rounded"><input type="number" id="edit_min" class="p-2 border rounded"><input type="number" id="edit_max" class="p-2 border rounded"><input type="date" id="edit_caducidad" class="p-2 border rounded"></div><label class="flex items-center gap-2 mt-2"><input type="checkbox" id="edit_granel"><span class="text-xs">⚖️ Granel</span></label><div class="flex justify-end gap-2 mt-4"><button onclick="cerrarModalEdicion()" class="px-4 py-2 bg-gray-200 rounded">Cancelar</button><button onclick="guardarEdicionProducto()" class="px-4 py-2 bg-orange-500 text-white rounded">Guardar</button></div></div>
+        <div class="bg-white p-6 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-black border-b pb-2">✏️ Editar Producto</h2>
+            <div class="grid grid-cols-2 gap-3 mt-3">
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">SKU</label><input type="text" id="edit_sku" class="w-full p-2 border rounded bg-gray-100 font-bold" disabled></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Nombre</label><input type="text" id="edit_nom" class="w-full p-2 border rounded font-bold"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Categoría</label><input type="text" id="edit_cat" class="w-full p-2 border rounded font-bold"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Proveedor</label><select id="edit_prov" class="w-full p-2 border rounded font-bold"></select></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Costo ($)</label><input type="number" id="edit_cos" class="w-full p-2 border rounded font-bold"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Precio Normal ($)</label><input type="number" id="edit_pre" class="w-full p-2 border rounded font-bold"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Precio Promo ($)</label><input type="number" id="edit_promo" class="w-full p-2 border rounded font-bold text-red-600"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Precio Mayoreo ($)</label><input type="number" id="edit_mayoreo" class="w-full p-2 border rounded font-bold text-blue-600"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Cant. Mayoreo</label><input type="number" id="edit_cant_mayoreo" class="w-full p-2 border rounded font-bold text-blue-600"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Stock Real</label><input type="number" id="edit_stk" class="w-full p-2 border rounded font-bold"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Stock Mínimo</label><input type="number" id="edit_min" class="w-full p-2 border rounded font-bold"></div>
+                <div><label class="block text-[10px] font-bold text-gray-500 uppercase">Stock Máximo</label><input type="number" id="edit_max" class="w-full p-2 border rounded font-bold"></div>
+                <div class="col-span-2"><label class="block text-[10px] font-bold text-gray-500 uppercase">Caducidad</label><input type="date" id="edit_caducidad" class="w-full p-2 border rounded font-bold text-gray-600"></div>
+            </div>
+            <label class="flex items-center gap-2 mt-3 bg-gray-50 p-2 rounded border"><input type="checkbox" id="edit_granel" class="accent-orange-500"><span class="text-xs font-bold text-gray-700">⚖️ Vender a granel (L/Kg)</span></label>
+            <div class="flex justify-end gap-2 mt-4 pt-4 border-t">
+                <button onclick="cerrarModalEdicion()" class="px-5 py-2.5 bg-gray-200 text-gray-800 font-bold rounded-xl transition">Cancelar</button>
+                <button onclick="guardarEdicionProducto()" class="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl shadow-md transition">Guardar Cambios</button>
+            </div>
+        </div>
     </div>
 
     <div id="modal-registro-rapido" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden">
