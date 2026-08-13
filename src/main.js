@@ -63,9 +63,10 @@ window.cambiarPestaña = (idTab) => {
     if(idTab === 'tab-agotados') window.renderAgotados();
     if(idTab === 'tab-proveedores') window.cargarProveedores();
     
-    // AUTO-GENERAR REPORTES HOY Y TOTAL STOCK
+   // AUTO-GENERAR REPORTES HOY Y TOTAL STOCK (Forzando Zona Horaria Local)
     if(idTab === 'tab-reportes') {
-        const hoy = new Date().toISOString().split('T')[0];
+        const f = new Date();
+        const hoy = f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0');
         document.getElementById('rep_fin').value = hoy;
         document.getElementById('rep_inicio').value = hoy;
         const selectCat = document.getElementById('rep_cat');
