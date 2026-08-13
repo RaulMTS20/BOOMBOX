@@ -63,7 +63,7 @@ window.cambiarPestaña = (idTab) => {
     if(idTab === 'tab-agotados') window.renderAgotados();
     if(idTab === 'tab-proveedores') window.cargarProveedores();
     
-   // AUTO-GENERAR REPORTES HOY Y TOTAL STOCK (Forzando Zona Horaria Local)
+    // AUTO-GENERAR REPORTES HOY Y TOTAL STOCK (Forzando Zona Horaria Local)
     if(idTab === 'tab-reportes') {
         const f = new Date();
         const hoy = f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0');
@@ -337,7 +337,6 @@ window.renderTabOrdenCompra = () => {
         let subCosto = (parseFloat(p.costo) || 0) * (parseFloat(p.pedir) || 0); totalCosto += subCosto;
         const stockActualStr = p.stock % 1 !== 0 ? parseFloat(p.stock).toFixed(2) : p.stock; const provStr = p.proveedor ? `🚚 ${p.proveedor}` : '📁 Sin Proveedor Asignado';
         
-        // BOTÓN BORRAR AGREGADO AL LADO DEL SUBTOTAL
         h += `
         <div class="bg-white p-4 rounded-2xl shadow-sm border-2 border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div class="flex-1 w-full">
@@ -364,11 +363,7 @@ window.renderTabOrdenCompra = () => {
     contenedor.innerHTML = h; document.getElementById('totalOrdenTab').innerText = `$${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
 };
 
-// NUEVA FUNCIÓN: Elimina de tajo el producto de la lista de orden
-window.eliminarDeOrden = (idx) => {
-    window.ordenCompraActual.splice(idx, 1);
-    window.renderTabOrdenCompra();
-};
+window.eliminarDeOrden = (idx) => { window.ordenCompraActual.splice(idx, 1); window.renderTabOrdenCompra(); };
 
 window.actualizarCantOrden = (idx, val) => {
     let nuevo = parseFloat(val) || 0; if (nuevo < 0) nuevo = 0;
@@ -431,11 +426,8 @@ window.generarReporte = async () => {
     
     // CÁLCULO DEL VALOR TOTAL EN STOCK (Basado en el Costo)
     let valorStockInfo = 0;
-    window.inventarioLocal.forEach(p => {
-        if(p.stock > 0) { valorStockInfo += (parseFloat(p.costo) || 0) * p.stock; }
-    });
-    const elStock = document.getElementById('rep_valor_stock');
-    if(elStock) elStock.innerText = `$${valorStockInfo.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+    window.inventarioLocal.forEach(p => { if(p.stock > 0) { valorStockInfo += (parseFloat(p.costo) || 0) * p.stock; } });
+    const elStock = document.getElementById('rep_valor_stock'); if(elStock) elStock.innerText = `$${valorStockInfo.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
 
     try {
         const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); let ventasPeriodo = [];
@@ -477,10 +469,25 @@ window.crearUsuarioSecundario = async () => {
     const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; const emp = localStorage.getItem('empresaId'); const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!u || !p || !em) return alert("Llena todos los datos"); 
     try { const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: emp, rol: r, zonas: zn, usuario: u }); alert(`✅ Usuario creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); } catch(er) { alert("Error al crear usuario: " + er.message); } 
 };
+
+// ESTE ES EL ESCUDO CONTRA ERRORES ROJOS EN LA TABLA DE USUARIOS
 window.cargarUsuarios = async () => { 
     const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaUsuariosBody'); tb.innerHTML = '<tr><td colspan="3" class="text-center p-8">Cargando...</td></tr>'; 
-    try { const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); const sn = await getDocs(q); let h = ''; sn.forEach(d => { const u = d.data(); h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${u.zonas.join(', ')}</td></tr>`; }); tb.innerHTML = h || '<tr><td colspan="3" class="text-center p-8">Sin usuarios registrados</td></tr>'; } catch(er) { tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error al cargar equipo</td></tr>`; } 
+    try { 
+        const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); const sn = await getDocs(q); let h = ''; 
+        sn.forEach(d => { 
+            const u = d.data(); 
+            // El escudo: Si un usuario manual no tiene zona, no se rompe, solo dice "Sin zona"
+            const zonasStr = (u.zonas && Array.isArray(u.zonas)) ? u.zonas.join(', ') : 'Sin zona asignada';
+            h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${zonasStr}</td></tr>`; 
+        }); 
+        tb.innerHTML = h || '<tr><td colspan="3" class="text-center p-8">Sin usuarios registrados</td></tr>'; 
+    } catch(er) { 
+        tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error al cargar equipo</td></tr>`; 
+        console.error("Error leyendo usuarios:", er);
+    } 
 };
+
 window.agregarNuevaZona = async () => { const nZ = prompt("Escribe el nombre exacto de la nueva zona:"); if(nZ) { const u = localStorage.getItem('currentUser'); const z = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!z.includes(nZ)) { z.push(nZ); await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); localStorage.setItem('zonas', JSON.stringify(z)); alert("Zona agregada correctamente. La página se actualizará."); location.reload(); } else { alert("Esa zona ya existe en tu registro."); } } };
 
 // 13. INICIO AUTOMÁTICO Y REGISTRO EXPRES
