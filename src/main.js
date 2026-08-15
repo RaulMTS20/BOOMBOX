@@ -26,9 +26,74 @@ window.mostrarNotificacion = (mensaje) => {
     const cont = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = 'toast'; t.innerText = mensaje; cont.appendChild(t); setTimeout(() => { if(t.parentNode) t.parentNode.removeChild(t); }, 2500);
 };
 
-// 🌐 CATÁLOGO GLOBAL CON FILTRO DE CÓDIGOS INTERNOS
+// 🖨️ GENERADOR DE TICKET TÉRMICO (ADAPTABLE 58mm y 80mm)
+window.imprimirTicket = (carrito, total, empresa, zona, cajero, fecha) => {
+    const iframe = document.getElementById('iframeImpresion');
+    const doc = iframe.contentWindow.document;
+    
+    let totalItems = 0; carrito.forEach(i => totalItems += parseFloat(i.cantidad));
+    
+    // El CSS ahora usa width: 100% y max-width: 80mm para adaptarse a cualquier impresora térmica
+    let html = `
+    <html><head><style>
+        @page { margin: 0; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 12px; margin: 0 auto; padding: 4px; width: 100%; max-width: 80mm; color: #000; box-sizing: border-box; }
+        .center { text-align: center; }
+        .right { text-align: right; }
+        .bold { font-weight: bold; }
+        .divider { border-top: 1px dashed #000; margin: 8px 0; }
+        .divider-thick { border-top: 2px solid #000; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        td { vertical-align: top; padding: 4px 0; }
+        .td-qty { width: 15%; color: #333; font-weight: bold; }
+        .td-item { width: 60%; }
+        .td-total { width: 25%; text-align: right; font-weight: bold; }
+        h1 { font-size: 18px; margin: 5px 0; font-weight: 900; text-transform: uppercase; }
+        .info-text { font-size: 11px; color: #444; margin-bottom: 2px; }
+    </style></head><body>
+        <div class="center">
+            <h1>${empresa}</h1>
+            <div class="info-text">Sucursal: ${zona}</div>
+            <div class="info-text">Fecha: ${fecha}</div>
+            <div class="info-text">Atiende: ${cajero}</div>
+        </div>
+        
+        <div class="divider-thick"></div>
+        <div class="bold" style="margin-bottom: 5px; font-size: 11px;">${carrito.length} artículos (Ctd: ${totalItems.toFixed(2).replace(/\.00$/, '')})</div>
+        <div class="divider"></div>
+        
+        <table>`;
+
+    carrito.forEach(i => {
+        const sub = i.precioVentaReal * i.cantidad;
+        const cV = i.cantidad % 1 !== 0 ? parseFloat(i.cantidad).toFixed(3) : i.cantidad;
+        const precioUnitarioHTML = (i.cantidad > 1 || i.es_granel) ? `<br><span style="color:#666; font-size:10px;">$${i.precioVentaReal.toLocaleString('es-MX', {minimumFractionDigits: 2})}</span>` : '';
+
+        html += `<tr>
+            <td class="td-qty">${cV}x</td>
+            <td class="td-item">
+                <span class="bold">${i.nombre.substring(0,25)}</span>
+                ${precioUnitarioHTML}
+            </td>
+            <td class="td-total">$${sub.toLocaleString('es-MX', {minimumFractionDigits: 2})}</td>
+        </tr>`;
+    });
+
+    html += `
+        </table>
+        <div class="divider-thick"></div>
+        <div class="right bold" style="font-size: 18px; margin: 8px 0;">Total: $${total.toLocaleString('es-MX', {minimumFractionDigits: 2})}</div>
+        <div class="divider"></div>
+        <div class="center bold" style="margin-top: 15px; font-size: 13px;">¡Gracias por su compra!</div>
+        <div class="center info-text" style="margin-top: 5px; margin-bottom: 20px;">BOOMBOX POS</div>
+    </body></html>`;
+
+    doc.open(); doc.write(html); doc.close();
+    setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); }, 500);
+};
+
+// 🌐 CATÁLOGO GLOBAL CON FILTRO
 window.actualizarCatalogoGlobal = async (sku, nombre, costo) => {
-    // FILTRO: Si el código tiene menos de 8 caracteres, es interno. NO SE SUBE A LA RED.
     if(!sku || !nombre || String(sku).trim().length < 8) return; 
     try {
         const docRef = doc(db, "SaaS_Catalogo_Global", sku);
@@ -44,18 +109,12 @@ window.actualizarCatalogoGlobal = async (sku, nombre, costo) => {
 
 window.buscarEnCatalogoGlobal = async (skuBuscado) => {
     document.getElementById('venta_busqueda').value = skuBuscado; 
-    
-    // FILTRO: Si es menor a 8 dígitos, ni siquiera busca en la red, va directo a registro local privado
-    if(String(skuBuscado).trim().length < 8) {
-        window.abrirModalRegistroRapido(skuBuscado, "", ""); 
-        return window.mostrarNotificacion("📝 Código corto detectado. Registro local privado.");
-    }
-    
+    if(String(skuBuscado).trim().length < 8) { window.abrirModalRegistroRapido(skuBuscado, "", ""); return window.mostrarNotificacion("📝 Código corto. Registro local."); }
     window.mostrarNotificacion("🔍 Buscando en la red BOOMBOX...");
     try {
         const docRef = doc(db, "SaaS_Catalogo_Global", skuBuscado); const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) { const d = docSnap.data(); window.abrirModalRegistroRapido(skuBuscado, d.nombre, d.costo_promedio); window.mostrarNotificacion("✨ Producto encontrado en la red."); } 
-        else { window.abrirModalRegistroRapido(skuBuscado, "", ""); window.mostrarNotificacion("⚠️ Producto nuevo. Sé el primero en registrarlo."); }
+        if (docSnap.exists()) { const d = docSnap.data(); window.abrirModalRegistroRapido(skuBuscado, d.nombre, d.costo_promedio); window.mostrarNotificacion("✨ Producto encontrado."); } 
+        else { window.abrirModalRegistroRapido(skuBuscado, "", ""); window.mostrarNotificacion("⚠️ Producto nuevo."); }
     } catch (e) { window.abrirModalRegistroRapido(skuBuscado, "", ""); }
 };
 
@@ -74,33 +133,13 @@ window.cambiarPestaña = (idTab) => {
 window.alCambiarZona = () => { window.cargarInventarioGeneral(); if(!document.getElementById('tab-kardex').classList.contains('hidden')) window.cargarKardex(window.kardexActual); if(!document.getElementById('tab-reportes').classList.contains('hidden')) window.generarReporte(); };
 window.calcularPrecioExacto = (p, cantVenta) => { let pFinal = p.precio; if (p.precio_promo && p.precio_promo > 0) pFinal = p.precio_promo; if (p.cant_mayoreo > 0 && cantVenta >= p.cant_mayoreo && p.precio_mayoreo > 0) pFinal = p.precio_mayoreo; return pFinal; };
 
-// 4. AUTENTICACIÓN Y SEGURIDAD MULTI-TENANT
 window.registrarNegocio = async () => { 
-    const btn = document.getElementById('btnRegister'); 
-    const eDisplay = document.getElementById('regEmpresa').value.trim(); 
-    const z = document.getElementById('regZona').value.trim(); 
-    const u = document.getElementById('regUser').value.trim(); 
-    const em = document.getElementById('regEmail').value.trim().toLowerCase(); 
-    const p = document.getElementById('regPass').value.trim();
-    
-    if(!eDisplay || !z || !u || !em || !p) return window.mostrarNotificacion("⚠️ Llena todos los campos."); 
-    btn.innerText = "Creando base de datos..."; btn.disabled = true;
-    
+    const btn = document.getElementById('btnRegister'); const eDisplay = document.getElementById('regEmpresa').value.trim(); const z = document.getElementById('regZona').value.trim(); const u = document.getElementById('regUser').value.trim(); const em = document.getElementById('regEmail').value.trim().toLowerCase(); const p = document.getElementById('regPass').value.trim();
+    if(!eDisplay || !z || !u || !em || !p) return window.mostrarNotificacion("⚠️ Llena todos los campos."); btn.innerText = "Creando base de datos..."; btn.disabled = true;
     try { 
-        const cred = await createUserWithEmailAndPassword(auth, em, p); 
-        const uid = cred.user.uid; 
-        
-        const sufijoAleatorio = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const eUnico = eDisplay.replace(/\s+/g, '').toUpperCase() + '_' + sufijoAleatorio; 
-        
-        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
-        await setDoc(doc(db, "SaaS_Usuarios", uid), { 
-            empresaId: eUnico,         
-            empresaNombre: eDisplay,   
-            zonas: [z], 
-            rol: "Dueño", 
-            usuario: u 
-        }); 
+        const cred = await createUserWithEmailAndPassword(auth, em, p); const uid = cred.user.uid; 
+        const sufijoAleatorio = Math.random().toString(36).substring(2, 6).toUpperCase(); const eUnico = eDisplay.replace(/\s+/g, '').toUpperCase() + '_' + sufijoAleatorio; 
+        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: eUnico, empresaNombre: eDisplay, zonas: [z], rol: "Dueño", usuario: u }); 
         window.mostrarNotificacion("✅ Negocio creado. Inicia sesión."); window.toggleAuth(); 
     } catch (er) { window.mostrarNotificacion("❌ Error: " + er.message); } finally { btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; }
 };
@@ -112,12 +151,7 @@ window.iniciarSesion = async () => {
         const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) { btn.innerText = "Entrar"; btn.disabled = false; return window.mostrarNotificacion("❌ Usuario no encontrado."); } 
         const cred = await signInWithEmailAndPassword(auth, dirDoc.data().email, p); const uid = cred.user.uid; const userDoc = await getDoc(doc(db, "SaaS_Usuarios", uid)); 
         if (userDoc.exists()) { 
-            const d = userDoc.data(); 
-            localStorage.setItem('currentUser', u); 
-            localStorage.setItem('empresaId', d.empresaId); 
-            localStorage.setItem('empresaNombre', d.empresaNombre || d.empresaId); 
-            localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); 
-            localStorage.setItem('userRol', d.rol || "Vendedor"); 
+            const d = userDoc.data(); localStorage.setItem('currentUser', u); localStorage.setItem('empresaId', d.empresaId); localStorage.setItem('empresaNombre', d.empresaNombre || d.empresaId); localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); localStorage.setItem('userRol', d.rol || "Vendedor"); 
             iniciarApp(); 
         } 
     } catch (er) { window.mostrarNotificacion("❌ Contraseña incorrecta."); } finally { btn.innerText = "Entrar"; btn.disabled = false; }
@@ -129,20 +163,11 @@ window.cerrarSesion = () => { localStorage.clear(); location.reload(); };
 function iniciarApp() {
     try {
         document.getElementById('authScreen').classList.add('hidden'); document.getElementById('appScreen').classList.remove('hidden');
-        
-        const eId = localStorage.getItem('empresaId') || "Negocio"; 
-        const eNombre = localStorage.getItem('empresaNombre') || eId; 
-        const u = localStorage.getItem('currentUser') || "Usuario"; 
-        const r = localStorage.getItem('userRol') || "Vendedor"; 
-        
+        const eId = localStorage.getItem('empresaId') || "Negocio"; const eNombre = localStorage.getItem('empresaNombre') || eId; const u = localStorage.getItem('currentUser') || "Usuario"; const r = localStorage.getItem('userRol') || "Vendedor"; 
         let zs = []; try { zs = JSON.parse(localStorage.getItem('zonas') || "[]"); if (!Array.isArray(zs) || zs.length === 0) zs = ["General"]; } catch(e) { zs = ["General"]; }
-        
-        document.getElementById('displayEmpresa').innerText = eNombre; 
-        document.getElementById('displayUser').innerText = `${u} (${r})`; const sZ = document.getElementById('zonaSelect'); sZ.innerHTML = ""; zs.forEach(z => sZ.add(new Option(z, z)));
-        
+        document.getElementById('displayEmpresa').innerText = eNombre; document.getElementById('displayUser').innerText = `${u} (${r})`; const sZ = document.getElementById('zonaSelect'); sZ.innerHTML = ""; zs.forEach(z => sZ.add(new Option(z, z)));
         if (r === 'Dueño' || r === 'Gerente') { ['btn-tab-registro','btn-tab-kardex','btn-tab-reportes','btn-tab-agotados','btn-tab-proveedores','btn-tab-orden','btnAgregarZona'].forEach(id => { const btnRef = document.getElementById(id); if(btnRef) btnRef.classList.remove('hidden'); }); document.querySelectorAll('.costo-col').forEach(el => el.classList.remove('hidden')); document.querySelectorAll('.accion-col').forEach(el => el.classList.remove('hidden')); } else { document.querySelectorAll('.costo-col').forEach(el => el.classList.add('hidden')); document.querySelectorAll('.accion-col').forEach(el => el.classList.add('hidden')); }
         if (r === 'Dueño') { document.getElementById('btn-tab-usuarios').classList.remove('hidden'); document.getElementById('btnVaciarInventario').classList.remove('hidden'); }
-        
         window.cargarInventarioGeneral(); window.cargarProveedores(); window.cambiarPestaña('tab-ventas'); 
     } catch (err) { window.cerrarSesion(); }
 }
@@ -153,11 +178,8 @@ window.iniciarCamara = (m) => {
     scanners[m] = new Html5Qrcode(`reader-${m}`);
     scanners[m].start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (decodedText) => {
         window.detenerCamara(m); if (navigator.vibrate) navigator.vibrate(100); 
-        if(m === 'ventas') { 
-            const p = window.inventarioLocal.find(x => x.sku === decodedText); 
-            if(p) { window.agregarAlCarrito(p); } else { window.buscarEnCatalogoGlobal(decodedText); }
-        } else { document.getElementById('p_sku').value = decodedText; }
-    }, (e) => { }).catch(err => { window.mostrarNotificacion("❌ Cámara bloqueada. Revisa los permisos de tu navegador."); });
+        if(m === 'ventas') { const p = window.inventarioLocal.find(x => x.sku === decodedText); if(p) { window.agregarAlCarrito(p); } else { window.buscarEnCatalogoGlobal(decodedText); } } else { document.getElementById('p_sku').value = decodedText; }
+    }, (e) => { }).catch(err => { window.mostrarNotificacion("❌ Cámara bloqueada. Revisa permisos."); });
 };
 window.detenerCamara = (m) => { if(scanners[m]) { scanners[m].stop().then(() => { document.getElementById(`reader-${m}`).classList.add('hidden'); document.getElementById(`btn-iniciar-camara-${m}`).classList.remove('hidden'); document.getElementById(`btn-detener-camara-${m}`).classList.add('hidden'); }).catch(e=>console.log(e)); } };
 
@@ -215,10 +237,15 @@ window.renderCarrito = () => {
 };
 
 window.procesarVentaCompleta = async () => {
-    if (window.carrito.length === 0) return window.mostrarNotificacion("⚠️ El carrito está vacío."); const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando..."; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0; 
+    if (window.carrito.length === 0) return window.mostrarNotificacion("⚠️ El carrito está vacío."); 
+    const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando..."; 
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const eNombre = localStorage.getItem('empresaNombre') || e; const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0; 
     try {
         for (const i of window.carrito) { const sub = i.precioVentaReal * i.cantidad; tot += sub; const ref = doc(db, `${e}_Inventario_${z}`, i.sku); const d = await getDoc(ref);
             if (d.exists()) { await setDoc(ref, { stock: d.data().stock - i.cantidad }, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts }); } }
+        
+        if (document.getElementById('chk_imprimir').checked) { window.imprimirTicket(window.carrito, tot, eNombre, z, u, f); }
+
         window.carrito = []; window.renderCarrito(); window.cargarInventarioGeneral(); btn.disabled = false; btn.innerText = "✅ Cobrar"; window.mostrarNotificacion("✅ Venta registrada"); 
     } catch(er) { window.mostrarNotificacion("❌ Ocurrió un error."); btn.disabled = false; btn.innerText = "✅ Cobrar"; } 
 };
