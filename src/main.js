@@ -114,7 +114,7 @@ window.iniciarCamara = (m) => {
             // 🌐 CONEXIÓN AL CATÁLOGO GLOBAL: Si no lo tiene, lo busca en internet
             if(p) { window.agregarAlCarrito(p); } else { window.buscarEnCatalogoGlobal(decodedText); }
         } else { document.getElementById('p_sku').value = decodedText; }
-    }, (e) => { }).catch(err => { window.mostrarNotificacion("❌ Cámara no soportada."); });
+    }, (e) => { }).catch(err => { window.mostrarNotificacion("❌ Cámara bloqueada. Revisa los permisos de tu navegador."); });
 };
 window.detenerCamara = (m) => { if(scanners[m]) { scanners[m].stop().then(() => { document.getElementById(`reader-${m}`).classList.add('hidden'); document.getElementById(`btn-iniciar-camara-${m}`).classList.remove('hidden'); document.getElementById(`btn-detener-camara-${m}`).classList.add('hidden'); }).catch(e=>console.log(e)); } };
 
