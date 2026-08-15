@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, addDoc, deleteDoc, query, where, writeBatch } from "firebase/firestore";
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, addDoc, deleteDoc, query, where, writeBatch, enableIndexedDbPersistence } from "firebase/firestore";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 
 // 1. CONFIGURACIÓN FIREBASE
@@ -19,6 +19,15 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 const secondaryAuth = getAuth(secondaryApp);
 
+// 🔋 MOTOR OFFLINE (Persistencia de datos sin internet)
+enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code == 'failed-precondition') {
+        console.warn("Modo Offline funciona solo si abres BOOMBOX en una sola pestaña.");
+    } else if (err.code == 'unimplemented') {
+        console.warn("Tu navegador no soporta el modo Offline.");
+    }
+});
+
 window.db = db; window.inventarioLocal = []; window.carrito = []; window.ordenCompraActual = []; window.kardexActual = 'entradas'; window.datosReporteCSV = []; window.categoriasUnicas = new Set(); 
 
 window.mostrarNotificacion = (mensaje) => {
@@ -33,7 +42,6 @@ window.imprimirTicket = (carrito, total, empresa, zona, cajero, fecha) => {
     
     let totalItems = 0; carrito.forEach(i => totalItems += parseFloat(i.cantidad));
     
-    // El CSS ahora usa width: 100% y max-width: 80mm para adaptarse a cualquier impresora térmica
     let html = `
     <html><head><style>
         @page { margin: 0; }
