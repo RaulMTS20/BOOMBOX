@@ -26,42 +26,29 @@ window.mostrarNotificacion = (mensaje) => {
     const cont = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = 'toast'; t.innerText = mensaje; cont.appendChild(t); setTimeout(() => { if(t.parentNode) t.parentNode.removeChild(t); }, 2500);
 };
 
-// 🌐 NUEVA FUNCIÓN: ALIMENTAR EL CATÁLOGO GLOBAL
+// 🌐 CATÁLOGO GLOBAL
 window.actualizarCatalogoGlobal = async (sku, nombre, costo) => {
     if(!sku || !nombre) return;
     try {
         const docRef = doc(db, "SaaS_Catalogo_Global", sku);
         const docSnap = await getDoc(docRef);
         let costoNum = parseFloat(costo) || 0;
-        
         if(docSnap.exists()) {
             const d = docSnap.data(); let aportes = d.aportes || 1; let costoProm = d.costo_promedio || 0;
             let nuevoPromedio = ((costoProm * aportes) + costoNum) / (aportes + 1);
             await setDoc(docRef, { costo_promedio: nuevoPromedio, aportes: aportes + 1 }, { merge: true });
-        } else {
-            await setDoc(docRef, { sku: sku, nombre: nombre.toUpperCase(), costo_promedio: costoNum, aportes: 1 });
-        }
+        } else { await setDoc(docRef, { sku: sku, nombre: nombre.toUpperCase(), costo_promedio: costoNum, aportes: 1 }); }
     } catch (e) { console.error("Error global catalog: ", e); }
 };
 
-// 🌐 NUEVA FUNCIÓN: BUSCAR EN EL CATÁLOGO GLOBAL
 window.buscarEnCatalogoGlobal = async (skuBuscado) => {
-    document.getElementById('venta_busqueda').value = skuBuscado;
-    window.mostrarNotificacion("🔍 Buscando en la red BOOMBOX...");
+    document.getElementById('venta_busqueda').value = skuBuscado; window.mostrarNotificacion("🔍 Buscando en la red BOOMBOX...");
     try {
-        const docRef = doc(db, "SaaS_Catalogo_Global", skuBuscado);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            const d = docSnap.data();
-            window.abrirModalRegistroRapido(skuBuscado, d.nombre, d.costo_promedio);
-            window.mostrarNotificacion("✨ Producto encontrado en la red.");
-        } else {
-            window.abrirModalRegistroRapido(skuBuscado, "", "");
-            window.mostrarNotificacion("⚠️ Producto nuevo. Sé el primero en registrarlo.");
-        }
+        const docRef = doc(db, "SaaS_Catalogo_Global", skuBuscado); const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) { const d = docSnap.data(); window.abrirModalRegistroRapido(skuBuscado, d.nombre, d.costo_promedio); window.mostrarNotificacion("✨ Producto encontrado en la red."); } 
+        else { window.abrirModalRegistroRapido(skuBuscado, "", ""); window.mostrarNotificacion("⚠️ Producto nuevo. Sé el primero en registrarlo."); }
     } catch (e) { window.abrirModalRegistroRapido(skuBuscado, "", ""); }
 };
-
 
 window.toggleAuth = () => { document.getElementById('loginForm').classList.toggle('hidden'); document.getElementById('registerForm').classList.toggle('hidden'); };
 
@@ -78,27 +65,78 @@ window.cambiarPestaña = (idTab) => {
 window.alCambiarZona = () => { window.cargarInventarioGeneral(); if(!document.getElementById('tab-kardex').classList.contains('hidden')) window.cargarKardex(window.kardexActual); if(!document.getElementById('tab-reportes').classList.contains('hidden')) window.generarReporte(); };
 window.calcularPrecioExacto = (p, cantVenta) => { let pFinal = p.precio; if (p.precio_promo && p.precio_promo > 0) pFinal = p.precio_promo; if (p.cant_mayoreo > 0 && cantVenta >= p.cant_mayoreo && p.precio_mayoreo > 0) pFinal = p.precio_mayoreo; return pFinal; };
 
-// AUTENTICACIÓN
+// 4. AUTENTICACIÓN Y SEGURIDAD MULTI-TENANT
 window.registrarNegocio = async () => { 
-    const btn = document.getElementById('btnRegister'); const e = document.getElementById('regEmpresa').value.trim().toUpperCase(); const z = document.getElementById('regZona').value.trim(); const u = document.getElementById('regUser').value.trim(); const em = document.getElementById('regEmail').value.trim().toLowerCase(); const p = document.getElementById('regPass').value.trim();
-    if(!e || !z || !u || !em || !p) return window.mostrarNotificacion("⚠️ Llena todos los campos."); btn.innerText = "Creando base de datos..."; btn.disabled = true;
-    try { const cred = await createUserWithEmailAndPassword(auth, em, p); const uid = cred.user.uid; await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: e.replace(/\s+/g, ''), zonas: [z], rol: "Dueño", usuario: u }); window.mostrarNotificacion("✅ Negocio creado. Inicia sesión."); window.toggleAuth(); } catch (er) { window.mostrarNotificacion("❌ Error: " + er.message); } finally { btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; }
+    const btn = document.getElementById('btnRegister'); 
+    const eDisplay = document.getElementById('regEmpresa').value.trim(); // Nombre bonito que ve el usuario
+    const z = document.getElementById('regZona').value.trim(); 
+    const u = document.getElementById('regUser').value.trim(); 
+    const em = document.getElementById('regEmail').value.trim().toLowerCase(); 
+    const p = document.getElementById('regPass').value.trim();
+    
+    if(!eDisplay || !z || !u || !em || !p) return window.mostrarNotificacion("⚠️ Llena todos los campos."); 
+    btn.innerText = "Creando base de datos..."; btn.disabled = true;
+    
+    try { 
+        const cred = await createUserWithEmailAndPassword(auth, em, p); 
+        const uid = cred.user.uid; 
+        
+        // SEGURIDAD MULTI-TENANT: Generador de ID Único
+        const sufijoAleatorio = Math.random().toString(36).substring(2, 6).toUpperCase();
+        const eUnico = eDisplay.replace(/\s+/g, '').toUpperCase() + '_' + sufijoAleatorio; // Ej. ABARROTESTOLUCA_X7B9
+        
+        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
+        await setDoc(doc(db, "SaaS_Usuarios", uid), { 
+            empresaId: eUnico,         // ID Interno de la base de datos
+            empresaNombre: eDisplay,   // Nombre público para mostrar en pantalla
+            zonas: [z], 
+            rol: "Dueño", 
+            usuario: u 
+        }); 
+        window.mostrarNotificacion("✅ Negocio creado. Inicia sesión."); window.toggleAuth(); 
+    } catch (er) { window.mostrarNotificacion("❌ Error: " + er.message); } finally { btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; }
 };
+
 window.iniciarSesion = async () => { 
     const btn = document.getElementById('btnLogin'); const u = document.getElementById('loginUser').value.trim(); const p = document.getElementById('loginPass').value.trim();
     if(!u || !p) return window.mostrarNotificacion("⚠️ Faltan datos."); btn.innerText = "Conectando..."; btn.disabled = true;
-    try { const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) { btn.innerText = "Entrar"; btn.disabled = false; return window.mostrarNotificacion("❌ Usuario no encontrado."); } const cred = await signInWithEmailAndPassword(auth, dirDoc.data().email, p); const uid = cred.user.uid; const userDoc = await getDoc(doc(db, "SaaS_Usuarios", uid)); if (userDoc.exists()) { const d = userDoc.data(); localStorage.setItem('currentUser', u); localStorage.setItem('empresaId', d.empresaId); localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); localStorage.setItem('userRol', d.rol || "Vendedor"); iniciarApp(); } } catch (er) { window.mostrarNotificacion("❌ Contraseña incorrecta."); } finally { btn.innerText = "Entrar"; btn.disabled = false; }
+    try { 
+        const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) { btn.innerText = "Entrar"; btn.disabled = false; return window.mostrarNotificacion("❌ Usuario no encontrado."); } 
+        const cred = await signInWithEmailAndPassword(auth, dirDoc.data().email, p); const uid = cred.user.uid; const userDoc = await getDoc(doc(db, "SaaS_Usuarios", uid)); 
+        if (userDoc.exists()) { 
+            const d = userDoc.data(); 
+            localStorage.setItem('currentUser', u); 
+            localStorage.setItem('empresaId', d.empresaId); 
+            // Guardamos el nombre bonito (con salvavidas para cuentas viejas)
+            localStorage.setItem('empresaNombre', d.empresaNombre || d.empresaId); 
+            localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); 
+            localStorage.setItem('userRol', d.rol || "Vendedor"); 
+            iniciarApp(); 
+        } 
+    } catch (er) { window.mostrarNotificacion("❌ Contraseña incorrecta."); } finally { btn.innerText = "Entrar"; btn.disabled = false; }
 };
+
 window.recuperarPassword = async () => { const u = prompt("Ingresa tu Usuario:"); if(!u) return; try { const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) return window.mostrarNotificacion("❌ No existe el usuario."); await sendPasswordResetEmail(auth, dirDoc.data().email); window.mostrarNotificacion(`✅ Enlace enviado al correo.`); } catch(e) { window.mostrarNotificacion("❌ Error al enviar enlace."); } };
 window.cerrarSesion = () => { localStorage.clear(); location.reload(); };
 
 function iniciarApp() {
     try {
         document.getElementById('authScreen').classList.add('hidden'); document.getElementById('appScreen').classList.remove('hidden');
-        const e = localStorage.getItem('empresaId') || "Negocio"; const u = localStorage.getItem('currentUser') || "Usuario"; const r = localStorage.getItem('userRol') || "Vendedor"; let zs = []; try { zs = JSON.parse(localStorage.getItem('zonas') || "[]"); if (!Array.isArray(zs) || zs.length === 0) zs = ["General"]; } catch(e) { zs = ["General"]; }
-        document.getElementById('displayEmpresa').innerText = e; document.getElementById('displayUser').innerText = `${u} (${r})`; const sZ = document.getElementById('zonaSelect'); sZ.innerHTML = ""; zs.forEach(z => sZ.add(new Option(z, z)));
+        
+        const eId = localStorage.getItem('empresaId') || "Negocio"; 
+        const eNombre = localStorage.getItem('empresaNombre') || eId; // Extraemos el nombre bonito
+        const u = localStorage.getItem('currentUser') || "Usuario"; 
+        const r = localStorage.getItem('userRol') || "Vendedor"; 
+        
+        let zs = []; try { zs = JSON.parse(localStorage.getItem('zonas') || "[]"); if (!Array.isArray(zs) || zs.length === 0) zs = ["General"]; } catch(e) { zs = ["General"]; }
+        
+        // Imprimimos el nombre bonito en la cabecera
+        document.getElementById('displayEmpresa').innerText = eNombre; 
+        document.getElementById('displayUser').innerText = `${u} (${r})`; const sZ = document.getElementById('zonaSelect'); sZ.innerHTML = ""; zs.forEach(z => sZ.add(new Option(z, z)));
+        
         if (r === 'Dueño' || r === 'Gerente') { ['btn-tab-registro','btn-tab-kardex','btn-tab-reportes','btn-tab-agotados','btn-tab-proveedores','btn-tab-orden','btnAgregarZona'].forEach(id => { const btnRef = document.getElementById(id); if(btnRef) btnRef.classList.remove('hidden'); }); document.querySelectorAll('.costo-col').forEach(el => el.classList.remove('hidden')); document.querySelectorAll('.accion-col').forEach(el => el.classList.remove('hidden')); } else { document.querySelectorAll('.costo-col').forEach(el => el.classList.add('hidden')); document.querySelectorAll('.accion-col').forEach(el => el.classList.add('hidden')); }
         if (r === 'Dueño') { document.getElementById('btn-tab-usuarios').classList.remove('hidden'); document.getElementById('btnVaciarInventario').classList.remove('hidden'); }
+        
         window.cargarInventarioGeneral(); window.cargarProveedores(); window.cambiarPestaña('tab-ventas'); 
     } catch (err) { window.cerrarSesion(); }
 }
@@ -111,7 +149,6 @@ window.iniciarCamara = (m) => {
         window.detenerCamara(m); if (navigator.vibrate) navigator.vibrate(100); 
         if(m === 'ventas') { 
             const p = window.inventarioLocal.find(x => x.sku === decodedText); 
-            // 🌐 CONEXIÓN AL CATÁLOGO GLOBAL: Si no lo tiene, lo busca en internet
             if(p) { window.agregarAlCarrito(p); } else { window.buscarEnCatalogoGlobal(decodedText); }
         } else { document.getElementById('p_sku').value = decodedText; }
     }, (e) => { }).catch(err => { window.mostrarNotificacion("❌ Cámara bloqueada. Revisa los permisos de tu navegador."); });
@@ -199,8 +236,7 @@ window.eliminarProveedor = async (id) => { if(!confirm("¿Borrar este proveedor?
 window.guardarProducto = async () => {
     const sku = document.getElementById('p_sku').value.trim(); const nom = document.getElementById('p_nom').value.trim(); const cat = document.getElementById('p_cat').value.trim() || "General"; const prov = document.getElementById('p_prov')?.value || ""; const cos = parseFloat(document.getElementById('p_cos').value) || 0; const pre = parseFloat(document.getElementById('p_pre').value) || 0; const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('p_stk').value) || 0; const minS = parseFloat(document.getElementById('p_min').value) || 0; const maxS = parseFloat(document.getElementById('p_max').value) || 0; const isGranel = document.getElementById('p_granel').checked; const cad = document.getElementById('p_caducidad').value || null; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); if(!sku || !nom) return window.mostrarNotificacion("⚠️ SKU y Nombre obligatorios.");
     try { const r = `${e}_Inventario_${z}`; const d = await getDoc(doc(db, r, sku)); let sF = stk; if (d.exists()) sF += d.data().stock; await setDoc(doc(db, r, sku), { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0 }, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); 
-    await window.actualizarCatalogoGlobal(sku, nom, cos); // 🌐 GUARDA EN LA RED GLOBAL
-    window.mostrarNotificacion("📦 Producto ingresado correctamente"); ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; document.getElementById('p_granel').checked = false; window.cargarInventarioGeneral(); } catch (err) { window.mostrarNotificacion("❌ Error al guardar producto."); }
+    await window.actualizarCatalogoGlobal(sku, nom, cos); window.mostrarNotificacion("📦 Producto ingresado correctamente"); ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; document.getElementById('p_granel').checked = false; window.cargarInventarioGeneral(); } catch (err) { window.mostrarNotificacion("❌ Error al guardar producto."); }
 };
 window.abrirModalEdicion = (sku) => { const p = window.inventarioLocal.find(x => x.sku === sku); if(!p) return; document.getElementById('edit_sku').value = p.sku; document.getElementById('edit_nom').value = p.nombre; document.getElementById('edit_cat').value = p.categoria || "General"; if(document.getElementById('edit_prov')) document.getElementById('edit_prov').value = p.proveedor || ""; document.getElementById('edit_cos').value = p.costo||0; document.getElementById('edit_pre').value = p.precio||0; document.getElementById('edit_promo').value = p.precio_promo || 0; document.getElementById('edit_mayoreo').value = p.precio_mayoreo || 0; document.getElementById('edit_cant_mayoreo').value = p.cant_mayoreo || 0; document.getElementById('edit_stk').value = p.stock||0; document.getElementById('edit_min').value = p.min_stk || 0; document.getElementById('edit_max').value = p.max_stk || 0; document.getElementById('edit_granel').checked = p.es_granel || false; document.getElementById('edit_caducidad').value = p.caducidad || ""; document.getElementById('modalEdicion').classList.remove('hidden'); };
 window.cerrarModalEdicion = () => { document.getElementById('modalEdicion').classList.add('hidden'); };
@@ -214,29 +250,28 @@ window.generarReporte = async () => {
 };
 window.descargarCSV = () => { if(window.datosReporteCSV.length <= 1) return window.mostrarNotificacion("⚠️ Genera un reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; window.datosReporteCSV.forEach(function(rowArray) { let row = rowArray.map(item => `"${item}"`).join(","); csvContent += row + "\r\n"; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Reporte.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
 window.cargarKardex = async (tipo = 'entradas') => { window.kardexActual = tipo; document.getElementById('btn-kardex-entradas').className = tipo === 'entradas' ? 'px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; document.getElementById('btn-kardex-salidas').className = tipo === 'salidas' ? 'px-4 py-2 font-bold text-red-600 border-b-4 border-red-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaKardexBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando base de datos...</td></tr>"; let movs = []; try { if (tipo === 'entradas') { const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); const iSn = await getDocs(qIngresos); iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); } else { const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); vSn.forEach(d => { movs.push({...d.data(), tipo: 'SALIDA'}); }); } movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); const movsRecientes = movs.slice(0, 100); let h = ""; movsRecientes.forEach(m => { let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; } if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; } const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad; h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`; }); tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>No hay movimientos registrados.</td></tr>`; } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error al consultar Kardex</td></tr>`; } };
-window.crearUsuarioSecundario = async () => { const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; const emp = localStorage.getItem('empresaId'); const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!u || !p || !em) return window.mostrarNotificacion("⚠️ Llena todos los datos"); try { const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: emp, rol: r, zonas: zn, usuario: u }); window.mostrarNotificacion(`✅ Usuario creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); } catch(er) { window.mostrarNotificacion("❌ Error: " + er.message); } };
+
+// ASIGNACIÓN DE IDENTIFICADORES A EMPLEADOS
+window.crearUsuarioSecundario = async () => { 
+    const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; 
+    const empId = localStorage.getItem('empresaId'); // ID Secreto
+    const empNom = localStorage.getItem('empresaNombre') || empId; // Nombre bonito
+    const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); 
+    if(!u || !p || !em) return window.mostrarNotificacion("⚠️ Llena todos los datos"); 
+    try { 
+        const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); 
+        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
+        await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: empId, empresaNombre: empNom, rol: r, zonas: zn, usuario: u }); 
+        window.mostrarNotificacion(`✅ Usuario creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); 
+    } catch(er) { window.mostrarNotificacion("❌ Error: " + er.message); } 
+};
 window.cargarUsuarios = async () => { const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaUsuariosBody'); tb.innerHTML = '<tr><td colspan="3" class="text-center p-8">Cargando...</td></tr>'; try { const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); const sn = await getDocs(q); let h = ''; sn.forEach(d => { const u = d.data(); const zonasStr = (u.zonas && Array.isArray(u.zonas)) ? u.zonas.join(', ') : 'Sin zona asignada'; h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${zonasStr}</td></tr>`; }); tb.innerHTML = h || '<tr><td colspan="3" class="text-center p-8">Sin usuarios registrados</td></tr>'; } catch(er) { tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error al cargar equipo</td></tr>`; console.error("Error leyendo usuarios:", er); } };
 window.agregarNuevaZona = async () => { const nZ = prompt("Escribe el nombre exacto de la nueva zona:"); if(nZ) { const u = localStorage.getItem('currentUser'); const z = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!z.includes(nZ)) { z.push(nZ); await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); localStorage.setItem('zonas', JSON.stringify(z)); window.mostrarNotificacion("✅ Zona agregada correctamente."); setTimeout(() => { location.reload(); }, 1500); } else { window.mostrarNotificacion("⚠️ Esa zona ya existe."); } } };
+
 if(localStorage.getItem('currentUser')) { iniciarApp(); }
 
-// 🌐 APERTURA DINÁMICA DEL MODAL EXPRESS (Recibe datos del catálogo global)
-window.abrirModalRegistroRapido = (skuPre = "", nombrePre = "", costoPre = "") => { 
-    const busquedaActual = skuPre || document.getElementById('venta_busqueda').value.trim(); 
-    document.getElementById('rr_sku').value = busquedaActual; 
-    document.getElementById('rr_nombre').value = nombrePre; 
-    document.getElementById('rr_costo').value = costoPre; 
-    document.getElementById('rr_precio').value = ''; 
-    document.getElementById('modal-registro-rapido').classList.remove('hidden'); 
-    
-    if(nombrePre === "") {
-        if(busquedaActual !== "") { document.getElementById('rr_nombre').focus(); } else { document.getElementById('rr_sku').focus(); }
-    } else {
-        document.getElementById('rr_precio').focus(); // Si viene del catálogo global, salta directo a ponerle precio
-    }
-};
-
+window.abrirModalRegistroRapido = (skuPre = "", nombrePre = "", costoPre = "") => { const busquedaActual = skuPre || document.getElementById('venta_busqueda').value.trim(); document.getElementById('rr_sku').value = busquedaActual; document.getElementById('rr_nombre').value = nombrePre; document.getElementById('rr_costo').value = costoPre; document.getElementById('rr_precio').value = ''; document.getElementById('modal-registro-rapido').classList.remove('hidden'); if(nombrePre === "") { if(busquedaActual !== "") { document.getElementById('rr_nombre').focus(); } else { document.getElementById('rr_sku').focus(); } } else { document.getElementById('rr_precio').focus(); } };
 window.cerrarModalRegistroRapido = () => { document.getElementById('modal-registro-rapido').classList.add('hidden'); document.getElementById('venta_busqueda').focus(); };
-
 window.guardarRegistroRapido = async () => {
     const sku = document.getElementById('rr_sku').value.trim(); const nom = document.getElementById('rr_nombre').value.trim().toUpperCase(); const cos = parseFloat(document.getElementById('rr_costo').value) || 0; const pre = parseFloat(document.getElementById('rr_precio').value) || 0;
     if (!sku || !nom || pre <= 0) { return window.mostrarNotificacion('⚠️ Datos inválidos en registro express.'); }
@@ -245,9 +280,7 @@ window.guardarRegistroRapido = async () => {
     try {
         const nuevoProducto = { sku: sku, nombre: nom, categoria: "General", proveedor: "", costo: cos, precio: pre, precio_mayoreo: 0, cant_mayoreo: 0, es_granel: false, stock: 0, min_stk: 0, max_stk: 0, caducidad: null, zona: z, precio_promo: 0 };
         const r = `${e}_Inventario_${z}`; await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku: sku, nombre: nom, cantidad: 0, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA_EXPRESS" });
-        
-        await window.actualizarCatalogoGlobal(sku, nom, cos); // 🌐 GUARDA EN LA RED GLOBAL
-
+        await window.actualizarCatalogoGlobal(sku, nom, cos); 
         window.inventarioLocal.push(nuevoProducto); window.cerrarModalRegistroRapido(); document.getElementById('venta_busqueda').value = ''; const productoParaCarrito = { ...nuevoProducto, stock: 9999 }; window.agregarAlCarrito(productoParaCarrito); window.mostrarNotificacion('✅ Producto express guardado.');
     } catch (error) { window.mostrarNotificacion('❌ Error al registrar producto express.'); } finally { btn.innerHTML = btnOriginalText; btn.disabled = false; }
 };
