@@ -26,9 +26,10 @@ window.mostrarNotificacion = (mensaje) => {
     const cont = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = 'toast'; t.innerText = mensaje; cont.appendChild(t); setTimeout(() => { if(t.parentNode) t.parentNode.removeChild(t); }, 2500);
 };
 
-// 🌐 CATÁLOGO GLOBAL
+// 🌐 CATÁLOGO GLOBAL CON FILTRO DE CÓDIGOS INTERNOS
 window.actualizarCatalogoGlobal = async (sku, nombre, costo) => {
-    if(!sku || !nombre) return;
+    // FILTRO: Si el código tiene menos de 8 caracteres, es interno. NO SE SUBE A LA RED.
+    if(!sku || !nombre || String(sku).trim().length < 8) return; 
     try {
         const docRef = doc(db, "SaaS_Catalogo_Global", sku);
         const docSnap = await getDoc(docRef);
@@ -42,7 +43,15 @@ window.actualizarCatalogoGlobal = async (sku, nombre, costo) => {
 };
 
 window.buscarEnCatalogoGlobal = async (skuBuscado) => {
-    document.getElementById('venta_busqueda').value = skuBuscado; window.mostrarNotificacion("🔍 Buscando en la red BOOMBOX...");
+    document.getElementById('venta_busqueda').value = skuBuscado; 
+    
+    // FILTRO: Si es menor a 8 dígitos, ni siquiera busca en la red, va directo a registro local privado
+    if(String(skuBuscado).trim().length < 8) {
+        window.abrirModalRegistroRapido(skuBuscado, "", ""); 
+        return window.mostrarNotificacion("📝 Código corto detectado. Registro local privado.");
+    }
+    
+    window.mostrarNotificacion("🔍 Buscando en la red BOOMBOX...");
     try {
         const docRef = doc(db, "SaaS_Catalogo_Global", skuBuscado); const docSnap = await getDoc(docRef);
         if (docSnap.exists()) { const d = docSnap.data(); window.abrirModalRegistroRapido(skuBuscado, d.nombre, d.costo_promedio); window.mostrarNotificacion("✨ Producto encontrado en la red."); } 
@@ -68,7 +77,7 @@ window.calcularPrecioExacto = (p, cantVenta) => { let pFinal = p.precio; if (p.p
 // 4. AUTENTICACIÓN Y SEGURIDAD MULTI-TENANT
 window.registrarNegocio = async () => { 
     const btn = document.getElementById('btnRegister'); 
-    const eDisplay = document.getElementById('regEmpresa').value.trim(); // Nombre bonito que ve el usuario
+    const eDisplay = document.getElementById('regEmpresa').value.trim(); 
     const z = document.getElementById('regZona').value.trim(); 
     const u = document.getElementById('regUser').value.trim(); 
     const em = document.getElementById('regEmail').value.trim().toLowerCase(); 
@@ -81,14 +90,13 @@ window.registrarNegocio = async () => {
         const cred = await createUserWithEmailAndPassword(auth, em, p); 
         const uid = cred.user.uid; 
         
-        // SEGURIDAD MULTI-TENANT: Generador de ID Único
         const sufijoAleatorio = Math.random().toString(36).substring(2, 6).toUpperCase();
-        const eUnico = eDisplay.replace(/\s+/g, '').toUpperCase() + '_' + sufijoAleatorio; // Ej. ABARROTESTOLUCA_X7B9
+        const eUnico = eDisplay.replace(/\s+/g, '').toUpperCase() + '_' + sufijoAleatorio; 
         
         await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
         await setDoc(doc(db, "SaaS_Usuarios", uid), { 
-            empresaId: eUnico,         // ID Interno de la base de datos
-            empresaNombre: eDisplay,   // Nombre público para mostrar en pantalla
+            empresaId: eUnico,         
+            empresaNombre: eDisplay,   
             zonas: [z], 
             rol: "Dueño", 
             usuario: u 
@@ -107,7 +115,6 @@ window.iniciarSesion = async () => {
             const d = userDoc.data(); 
             localStorage.setItem('currentUser', u); 
             localStorage.setItem('empresaId', d.empresaId); 
-            // Guardamos el nombre bonito (con salvavidas para cuentas viejas)
             localStorage.setItem('empresaNombre', d.empresaNombre || d.empresaId); 
             localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); 
             localStorage.setItem('userRol', d.rol || "Vendedor"); 
@@ -124,13 +131,12 @@ function iniciarApp() {
         document.getElementById('authScreen').classList.add('hidden'); document.getElementById('appScreen').classList.remove('hidden');
         
         const eId = localStorage.getItem('empresaId') || "Negocio"; 
-        const eNombre = localStorage.getItem('empresaNombre') || eId; // Extraemos el nombre bonito
+        const eNombre = localStorage.getItem('empresaNombre') || eId; 
         const u = localStorage.getItem('currentUser') || "Usuario"; 
         const r = localStorage.getItem('userRol') || "Vendedor"; 
         
         let zs = []; try { zs = JSON.parse(localStorage.getItem('zonas') || "[]"); if (!Array.isArray(zs) || zs.length === 0) zs = ["General"]; } catch(e) { zs = ["General"]; }
         
-        // Imprimimos el nombre bonito en la cabecera
         document.getElementById('displayEmpresa').innerText = eNombre; 
         document.getElementById('displayUser').innerText = `${u} (${r})`; const sZ = document.getElementById('zonaSelect'); sZ.innerHTML = ""; zs.forEach(z => sZ.add(new Option(z, z)));
         
@@ -227,7 +233,7 @@ window.abrirPestañaOrden = () => { if (window.ordenCompraActual.length === 0) {
 window.generarOrdenCompra = () => { let faltantes = window.inventarioLocal.filter(p => parseFloat(p.stock) <= (parseFloat(p.min_stk) || 0)); if(faltantes.length === 0) return window.mostrarNotificacion("✅ Todo el inventario está por encima del mínimo."); window.ordenCompraActual = faltantes.map(p => { let sugerido = (parseFloat(p.max_stk) || 0) > 0 ? (parseFloat(p.max_stk) - parseFloat(p.stock)) : 1; if (sugerido < 0) sugerido = 0; return { ...p, pedir: sugerido }; }); window.cambiarPestaña('tab-orden'); window.renderTabOrdenCompra(); };
 window.renderTabOrdenCompra = () => { const contenedor = document.getElementById('contenedorTarjetasOrden'); if(!contenedor) return; let h = ""; let totalCosto = 0; if (window.ordenCompraActual.length === 0) { contenedor.innerHTML = `<div class="bg-white p-8 rounded-2xl text-center text-gray-400 font-bold border-2 border-dashed">No hay productos en la lista</div>`; return; } window.ordenCompraActual.forEach((p, idx) => { let subCosto = (parseFloat(p.costo) || 0) * (parseFloat(p.pedir) || 0); totalCosto += subCosto; const stockActualStr = p.stock % 1 !== 0 ? parseFloat(p.stock).toFixed(2) : p.stock; const provStr = p.proveedor ? `🚚 ${p.proveedor}` : '📁 Sin Proveedor Asignado'; h += `<div class="bg-white p-4 rounded-2xl shadow-sm border-2 border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div class="flex-1 w-full"><span class="text-[11px] font-extrabold uppercase tracking-wide text-teal-600 bg-teal-50 px-2 py-0.5 rounded-md mb-1 inline-block">${provStr}</span><h3 class="text-lg font-black text-gray-800 leading-tight">${p.nombre}</h3><div class="flex gap-4 mt-1 text-sm text-gray-500 font-bold"><span>Stock actual: <strong class="text-red-500">${stockActualStr}</strong></span><span>Costo: <strong>$${(parseFloat(p.costo)||0).toFixed(2)}</strong></span></div></div><div class="flex items-center justify-between w-full sm:w-auto gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-gray-100"><div class="flex items-center gap-2"><span class="text-xs font-bold text-gray-400 uppercase">Pedir:</span><input type="number" step="${p.es_granel ? '0.01' : '1'}" min="0" value="${p.pedir}" onchange="window.actualizarCantOrden(${idx}, this.value)" class="w-20 p-2 border-2 border-emerald-400 rounded-xl text-center font-black focus:ring-2 focus:ring-emerald-500"><span class="text-xs font-bold text-gray-500">${p.es_granel ? 'L/Kg' : 'Pzas'}</span></div><div class="flex items-center gap-4"><div class="text-right min-w-[80px]"><span class="text-[10px] block text-gray-400 font-bold uppercase">Subtotal</span><span class="text-lg font-black text-orange-600">$${subCosto.toFixed(2)}</span></div><button onclick="window.eliminarDeOrden(${idx})" class="text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors" title="Eliminar de la lista">🗑️</button></div></div></div>`; }); contenedor.innerHTML = h; document.getElementById('totalOrdenTab').innerText = `$${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; };
 window.eliminarDeOrden = (idx) => { window.ordenCompraActual.splice(idx, 1); window.renderTabOrdenCompra(); }; window.actualizarCantOrden = (idx, val) => { let nuevo = parseFloat(val) || 0; if (nuevo < 0) nuevo = 0; window.ordenCompraActual[idx].pedir = nuevo; window.renderTabOrdenCompra(); };
-window.enviarOrdenWhatsApp = () => { const e = localStorage.getItem('empresaId'); const z = document.getElementById('zonaSelect').value; let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); if(filterPedir.length === 0) return window.mostrarNotificacion("⚠️ No hay productos para pedir."); let textoMensaje = `📋 *NUEVA ORDEN DE COMPRA*\n🏢 *Negocio:* ${e}\n📍 *Sucursal:* ${z}\n\n*Productos solicitados:*\n`; let totalCosto = 0; filterPedir.forEach(p => { let subCosto = (parseFloat(p.costo) || 0) * p.pedir; totalCosto += subCosto; textoMensaje += `📦 ${p.pedir} x ${String(p.nombre).substring(0,25)}\n`; }); textoMensaje += `\n💰 *Total Estimado:* $${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; window.open(`https://wa.me/?text=${encodeURIComponent(textoMensaje)}`, '_blank'); };
+window.enviarOrdenWhatsApp = () => { const e = localStorage.getItem('empresaNombre') || localStorage.getItem('empresaId'); const z = document.getElementById('zonaSelect').value; let filterPedir = window.ordenCompraActual.filter(p => p.pedir > 0); if(filterPedir.length === 0) return window.mostrarNotificacion("⚠️ No hay productos para pedir."); let textoMensaje = `📋 *NUEVA ORDEN DE COMPRA*\n🏢 *Negocio:* ${e}\n📍 *Sucursal:* ${z}\n\n*Productos solicitados:*\n`; let totalCosto = 0; filterPedir.forEach(p => { let subCosto = (parseFloat(p.costo) || 0) * p.pedir; totalCosto += subCosto; textoMensaje += `📦 ${p.pedir} x ${String(p.nombre).substring(0,25)}\n`; }); textoMensaje += `\n💰 *Total Estimado:* $${totalCosto.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; window.open(`https://wa.me/?text=${encodeURIComponent(textoMensaje)}`, '_blank'); };
 
 window.guardarProveedor = async () => { const nom = document.getElementById('prov_nombre').value.trim(); const tel = document.getElementById('prov_tel').value.trim(); const not = document.getElementById('prov_notas').value.trim(); const e = localStorage.getItem('empresaId'); let dias = []; document.querySelectorAll('.prov_dia:checked').forEach(c => dias.push(c.value)); if(!nom) return window.mostrarNotificacion("⚠️ El nombre es obligatorio."); try { const id = nom.replace(/[^a-zA-Z0-9]/g, '').toUpperCase(); await setDoc(doc(db, `${e}_Proveedores`, id), { id, nombre: nom, telefono: tel, dias: dias, notas: not, timestamp: Date.now() }); window.mostrarNotificacion("✅ Proveedor guardado"); document.getElementById('prov_nombre').value = ''; document.getElementById('prov_tel').value = ''; document.getElementById('prov_notas').value = ''; document.querySelectorAll('.prov_dia').forEach(c => c.checked = false); window.cargarProveedores(); } catch(er) { window.mostrarNotificacion("❌ Error al guardar proveedor."); } };
 window.cargarProveedores = async () => { const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaProveedoresBody'); tb.innerHTML = "<tr><td colspan='4' class='text-center p-8'>Cargando...</td></tr>"; let h = ""; let opts = '<option value="">Seleccionar Proveedor...</option>'; try { const sn = await getDocs(collection(db, `${e}_Proveedores`)); sn.forEach(d => { const pr = d.data(); const diasStr = pr.dias.length > 0 ? pr.dias.join(', ') : 'Llamada previa'; h += `<tr class="border-b"><td class="p-3"><span class="font-bold text-teal-700 block">${pr.nombre}</span><span class="text-xs text-gray-500">📞 ${pr.telefono||'Sin Tel'}</span></td><td class="p-3 text-sm font-bold">${diasStr}</td><td class="p-3 text-xs text-gray-600 whitespace-pre-wrap">${pr.notas}</td><td class="p-3"><button onclick="eliminarProveedor('${pr.id}')" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded transition">🗑️</button></td></tr>`; opts += `<option value="${pr.nombre}">${pr.nombre}</option>`; }); tb.innerHTML = h || "<tr><td colspan='4' class='text-center p-8'>Sin proveedores registrados</td></tr>"; const p_prov = document.getElementById('p_prov'); const edit_prov = document.getElementById('edit_prov'); if (p_prov) p_prov.innerHTML = opts; if (edit_prov) edit_prov.innerHTML = opts; } catch (er) { tb.innerHTML = "<tr><td colspan='4' class='text-center p-8 text-red-500'>Error</td></tr>"; } };
@@ -251,20 +257,7 @@ window.generarReporte = async () => {
 window.descargarCSV = () => { if(window.datosReporteCSV.length <= 1) return window.mostrarNotificacion("⚠️ Genera un reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; window.datosReporteCSV.forEach(function(rowArray) { let row = rowArray.map(item => `"${item}"`).join(","); csvContent += row + "\r\n"; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Reporte.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
 window.cargarKardex = async (tipo = 'entradas') => { window.kardexActual = tipo; document.getElementById('btn-kardex-entradas').className = tipo === 'entradas' ? 'px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; document.getElementById('btn-kardex-salidas').className = tipo === 'salidas' ? 'px-4 py-2 font-bold text-red-600 border-b-4 border-red-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaKardexBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando base de datos...</td></tr>"; let movs = []; try { if (tipo === 'entradas') { const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); const iSn = await getDocs(qIngresos); iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); } else { const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); vSn.forEach(d => { movs.push({...d.data(), tipo: 'SALIDA'}); }); } movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); const movsRecientes = movs.slice(0, 100); let h = ""; movsRecientes.forEach(m => { let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; } if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; } const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad; h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`; }); tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>No hay movimientos registrados.</td></tr>`; } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error al consultar Kardex</td></tr>`; } };
 
-// ASIGNACIÓN DE IDENTIFICADORES A EMPLEADOS
-window.crearUsuarioSecundario = async () => { 
-    const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; 
-    const empId = localStorage.getItem('empresaId'); // ID Secreto
-    const empNom = localStorage.getItem('empresaNombre') || empId; // Nombre bonito
-    const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); 
-    if(!u || !p || !em) return window.mostrarNotificacion("⚠️ Llena todos los datos"); 
-    try { 
-        const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); 
-        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
-        await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: empId, empresaNombre: empNom, rol: r, zonas: zn, usuario: u }); 
-        window.mostrarNotificacion(`✅ Usuario creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); 
-    } catch(er) { window.mostrarNotificacion("❌ Error: " + er.message); } 
-};
+window.crearUsuarioSecundario = async () => { const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; const empId = localStorage.getItem('empresaId'); const empNom = localStorage.getItem('empresaNombre') || empId; const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!u || !p || !em) return window.mostrarNotificacion("⚠️ Llena todos los datos"); try { const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: empId, empresaNombre: empNom, rol: r, zonas: zn, usuario: u }); window.mostrarNotificacion(`✅ Usuario creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); } catch(er) { window.mostrarNotificacion("❌ Error: " + er.message); } };
 window.cargarUsuarios = async () => { const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaUsuariosBody'); tb.innerHTML = '<tr><td colspan="3" class="text-center p-8">Cargando...</td></tr>'; try { const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); const sn = await getDocs(q); let h = ''; sn.forEach(d => { const u = d.data(); const zonasStr = (u.zonas && Array.isArray(u.zonas)) ? u.zonas.join(', ') : 'Sin zona asignada'; h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${zonasStr}</td></tr>`; }); tb.innerHTML = h || '<tr><td colspan="3" class="text-center p-8">Sin usuarios registrados</td></tr>'; } catch(er) { tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error al cargar equipo</td></tr>`; console.error("Error leyendo usuarios:", er); } };
 window.agregarNuevaZona = async () => { const nZ = prompt("Escribe el nombre exacto de la nueva zona:"); if(nZ) { const u = localStorage.getItem('currentUser'); const z = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!z.includes(nZ)) { z.push(nZ); await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); localStorage.setItem('zonas', JSON.stringify(z)); window.mostrarNotificacion("✅ Zona agregada correctamente."); setTimeout(() => { location.reload(); }, 1500); } else { window.mostrarNotificacion("⚠️ Esa zona ya existe."); } } };
 
