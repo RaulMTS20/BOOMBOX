@@ -249,8 +249,15 @@ window.procesarVentaCompleta = async () => {
     const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando..."; 
     const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const eNombre = localStorage.getItem('empresaNombre') || e; const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0; 
     try {
-        for (const i of window.carrito) { const sub = i.precioVentaReal * i.cantidad; tot += sub; const ref = doc(db, `${e}_Inventario_${z}`, i.sku); const d = await getDoc(ref);
-            if (d.exists()) { await setDoc(ref, { stock: d.data().stock - i.cantidad }, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts }); } }
+        for (const i of window.carrito) { 
+            const sub = i.precioVentaReal * i.cantidad; tot += sub; 
+            const ref = doc(db, `${e}_Inventario_${z}`, i.sku); 
+            
+            // ELIMINAMOS getDoc(). Ahora calculamos el stock con los datos locales para que no se trabe sin internet.
+            const nuevoStock = i.stock - i.cantidad;
+            await setDoc(ref, { stock: nuevoStock }, { merge: true }); 
+            await addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts }); 
+        }
         
         if (document.getElementById('chk_imprimir').checked) { window.imprimirTicket(window.carrito, tot, eNombre, z, u, f); }
 
