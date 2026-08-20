@@ -285,7 +285,7 @@
         <div class="bg-white p-6 rounded-2xl max-w-sm w-full"><h2 class="text-xl font-black">⚡ Express</h2><input type="text" id="rr_sku" class="w-full p-3 border rounded mt-3" placeholder="SKU"><input type="text" id="rr_nombre" class="w-full p-3 border rounded mt-3" placeholder="Nombre"><div class="grid grid-cols-2 gap-2 mt-3"><input type="number" id="rr_costo" class="p-3 border rounded" placeholder="Costo"><input type="number" id="rr_precio" class="p-3 border rounded" placeholder="Precio"></div><div class="flex justify-end gap-2 mt-4"><button onclick="cerrarModalRegistroRapido()" class="px-4 py-2 bg-gray-200 rounded">Cancelar</button><button onclick="guardarRegistroRapido()" class="px-4 py-2 bg-orange-500 text-white rounded">Guardar</button></div></div>
     </div>
 
-    <iframe id="iframeImpresion" style="display:none;"></iframe>
+    <iframe id="iframeImpresion" style="visibility: hidden; width: 0; height: 0; position: absolute; border: 0;"></iframe>
 
     <script type="module" src="/src/main.js"></script>
 </body>

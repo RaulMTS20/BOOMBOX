@@ -247,22 +247,47 @@ window.renderCarrito = () => {
 window.procesarVentaCompleta = async () => {
     if (window.carrito.length === 0) return window.mostrarNotificacion("⚠️ El carrito está vacío."); 
     const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando..."; 
-    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const eNombre = localStorage.getItem('empresaNombre') || e; const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0; 
+    const z = document.getElementById('zonaSelect').value; 
+    const e = localStorage.getItem('empresaId'); 
+    const eNombre = localStorage.getItem('empresaNombre') || e; 
+    const u = localStorage.getItem('currentUser'); 
+    const ts = Date.now(); 
+    const f = new Date(ts).toLocaleString('es-MX'); 
+    let tot = 0; 
+    
     try {
         for (const i of window.carrito) { 
             const sub = i.precioVentaReal * i.cantidad; tot += sub; 
             const ref = doc(db, `${e}_Inventario_${z}`, i.sku); 
-            
-            // ELIMINAMOS getDoc(). Ahora calculamos el stock con los datos locales para que no se trabe sin internet.
             const nuevoStock = i.stock - i.cantidad;
-            await setDoc(ref, { stock: nuevoStock }, { merge: true }); 
-            await addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts }); 
+            
+            // 1. SIN 'await'. Firebase lo guarda en el disco duro y avanza instantáneamente.
+            setDoc(ref, { stock: nuevoStock }, { merge: true }); 
+            addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts }); 
+            
+            // 2. Actualizamos la memoria local para no tener que descargar la base de datos de nuevo
+            let itemLocal = window.inventarioLocal.find(x => x.sku === i.sku);
+            if(itemLocal) itemLocal.stock = nuevoStock;
         }
         
-        if (document.getElementById('chk_imprimir').checked) { window.imprimirTicket(window.carrito, tot, eNombre, z, u, f); }
+        // 3. Imprimimos ticket
+        const chkImprimir = document.getElementById('chk_imprimir');
+        if (chkImprimir && chkImprimir.checked) { 
+            window.imprimirTicket(window.carrito, tot, eNombre, z, u, f); 
+        }
 
-        window.carrito = []; window.renderCarrito(); window.cargarInventarioGeneral(); btn.disabled = false; btn.innerText = "✅ Cobrar"; window.mostrarNotificacion("✅ Venta registrada"); 
-    } catch(er) { window.mostrarNotificacion("❌ Ocurrió un error."); btn.disabled = false; btn.innerText = "✅ Cobrar"; } 
+        // 4. Limpiamos carrito y redibujamos la tabla usando solo la memoria local
+        window.carrito = []; 
+        window.renderCarrito(); 
+        window.renderInventarioPantalla(); 
+        if(!document.getElementById('tab-agotados').classList.contains('hidden')) window.renderAgotados();
+        
+        btn.disabled = false; btn.innerText = "✅ Cobrar"; window.mostrarNotificacion("✅ Venta registrada"); 
+    } catch(er) { 
+        console.error(er);
+        window.mostrarNotificacion("❌ Ocurrió un error."); 
+        btn.disabled = false; btn.innerText = "✅ Cobrar"; 
+    } 
 };
 
 window.renderAgotados = () => {
