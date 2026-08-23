@@ -154,11 +154,34 @@ window.verificarGiro = () => {
 
 window.obtenerGPS = () => {
     if (!navigator.geolocation) return window.mostrarNotificacion("❌ Tu navegador no soporta GPS.");
-    window.mostrarNotificacion("⏳ Buscando ubicación...");
+    window.mostrarNotificacion("⏳ Triangulando y traduciendo ubicación...");
+    
     navigator.geolocation.getCurrentPosition(
-        (position) => { 
-            document.getElementById('regUbicacion').value = `${position.coords.latitude}, ${position.coords.longitude}`; 
-            window.mostrarNotificacion("✅ GPS Capturado."); 
+        async (position) => { 
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            const coordenadasReales = `${lat}, ${lon}`;
+            
+            // 1. Guardamos los números puros en el campo oculto para tu base de datos
+            document.getElementById('regCoords').value = coordenadasReales;
+            
+            try {
+                // 2. Consultamos la API pública para traducir a texto
+                const respuesta = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
+                const data = await respuesta.json();
+                
+                if (data && data.display_name) {
+                    // 3. Mostramos el texto legible al usuario
+                    document.getElementById('regUbicacion').value = data.display_name;
+                    window.mostrarNotificacion("✅ Ubicación detectada."); 
+                } else {
+                    document.getElementById('regUbicacion').value = "Ubicación encontrada (Sin nombre de calle)";
+                }
+            } catch (error) {
+                // Plan B por si falla el servidor de mapas gratuito
+                document.getElementById('regUbicacion').value = coordenadasReales;
+                window.mostrarNotificacion("⚠️ Se guardó el GPS, pero falló la traducción de texto.");
+            }
         },
         (error) => { 
             window.mostrarNotificacion("⚠️ GPS denegado. Escríbela manual."); 
@@ -167,10 +190,32 @@ window.obtenerGPS = () => {
 };
 
 window.registrarNegocio = async () => { 
-    const btn = document.getElementById('btnRegister'); const eDisplay = document.getElementById('regEmpresa').value.trim(); const z = document.getElementById('regZona').value.trim(); const u = document.getElementById('regUser').value.trim(); const em = document.getElementById('regEmail').value.trim().toLowerCase(); const p = document.getElementById('regPass').value.trim();
-    if(!eDisplay || !z || !u || !em || !p) return window.mostrarNotificacion("⚠️ Llena todos los campos."); btn.innerText = "Creando base de datos..."; btn.disabled = true;
-    try { const cred = await createUserWithEmailAndPassword(auth, em, p); const uid = cred.user.uid; const sufijoAleatorio = Math.random().toString(36).substring(2, 6).toUpperCase(); const eUnico = eDisplay.replace(/\s+/g, '').toUpperCase() + '_' + sufijoAleatorio; 
-        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: eUnico, empresaNombre: eDisplay, zonas: [z], rol: "Dueño", usuario: u }); 
+    const btn = document.getElementById('btnRegister'); 
+    const eDisplay = document.getElementById('regEmpresa').value.trim(); const z = document.getElementById('regZona').value.trim(); const u = document.getElementById('regUser').value.trim(); const em = document.getElementById('regEmail').value.trim().toLowerCase(); const p = document.getElementById('regPass').value.trim();
+    
+    // Capturamos el giro, el texto y las coordenadas ocultas
+    const giro = document.getElementById('regGiro').value; 
+    const numVendedor = document.getElementById('regNumVendedor').value.trim(); 
+    const ubicacionTexto = document.getElementById('regUbicacion').value.trim();
+    const coordenadasSatelitales = document.getElementById('regCoords').value.trim() || "No capturadas";
+    
+    if(!eDisplay || !z || !u || !em || !p || !giro) return window.mostrarNotificacion("⚠️ Llena todos los campos (Giro es obligatorio)."); 
+    btn.innerText = "Creando base de datos..."; btn.disabled = true;
+    
+    try { 
+        const cred = await createUserWithEmailAndPassword(auth, em, p); const uid = cred.user.uid; const sufijoAleatorio = Math.random().toString(36).substring(2, 6).toUpperCase(); const eUnico = eDisplay.replace(/\s+/g, '').toUpperCase() + '_' + sufijoAleatorio; 
+        const fechaActualISO = new Date().toISOString(); 
+
+        await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); 
+        await setDoc(doc(db, "SaaS_Usuarios", uid), { 
+            empresaId: eUnico, empresaNombre: eDisplay, zonas: [z], rol: "Dueño", usuario: u, 
+            giro: giro, numVendedor: numVendedor, 
+            ubicacion: ubicacionTexto, // Lo que ve el cliente
+            coordenadasGPS: coordenadasSatelitales, // El dato de valor comercial para ti
+            plan: "basico", 
+            fechaCreacion: fechaActualISO 
+        }); 
+        
         window.mostrarNotificacion("✅ Negocio creado. Inicia sesión."); window.toggleAuth(); 
     } catch (er) { window.mostrarNotificacion("❌ Error."); } finally { btn.innerText = "Crear Cuenta Principal"; btn.disabled = false; }
 };

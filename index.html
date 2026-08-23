@@ -77,6 +77,12 @@
                         <input type="text" id="regUbicacion" class="w-full p-2 border rounded-xl flex-1 text-sm" placeholder="Dirección o Ubicación">
                         <button onclick="obtenerGPS()" class="px-4 py-2 bg-blue-100 text-blue-700 font-bold rounded-xl border border-blue-200" title="Usar mi ubicación GPS">📍 GPS</button>
                     </div>
+                    <!-- CAMPO OCULTO PARA LAS COORDENADAS SATELITALES -->
+                    <input type="hidden" id="regCoords">
+                    <p class="text-[10px] text-gray-500 font-medium leading-tight">
+                        *Tus datos de ubicación nos ayudarán próximamente a brindarte sugerencias de precios basados en tu región para maximizar tus ganancias.
+                    </p>
+                </div>
                     <p class="text-[10px] text-gray-500 font-medium leading-tight">
                         *Tus datos de ubicación nos ayudarán próximamente a brindarte sugerencias de precios basados en tu región para maximizar tus ganancias.
                     </p>
@@ -354,6 +360,6 @@
         </div>
     </div>
 
-    <script type="module" src="/src/main.js?v=1.2"></script>
+    <script type="module" src="/src/main.js?v=1.3"></script>
 </body>
 </html>
