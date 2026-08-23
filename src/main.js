@@ -154,7 +154,7 @@ window.verificarGiro = () => {
 
 window.obtenerGPS = () => {
     if (!navigator.geolocation) return window.mostrarNotificacion("❌ Tu navegador no soporta GPS.");
-    window.mostrarNotificacion("⏳ Triangulando y traduciendo ubicación...");
+    window.mostrarNotificacion("⏳ Triangulando alta precisión...");
     
     navigator.geolocation.getCurrentPosition(
         async (position) => { 
@@ -162,33 +162,30 @@ window.obtenerGPS = () => {
             const lon = position.coords.longitude;
             const coordenadasReales = `${lat}, ${lon}`;
             
-            // 1. Guardamos los números puros en el campo oculto para tu base de datos
             document.getElementById('regCoords').value = coordenadasReales;
             
             try {
-                // 2. Consultamos la API pública para traducir a texto
                 const respuesta = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`);
                 const data = await respuesta.json();
                 
                 if (data && data.display_name) {
-                    // 3. Mostramos el texto legible al usuario
                     document.getElementById('regUbicacion').value = data.display_name;
-                    window.mostrarNotificacion("✅ Ubicación detectada."); 
+                    window.mostrarNotificacion("✅ Ubicación precisa detectada."); 
                 } else {
                     document.getElementById('regUbicacion').value = "Ubicación encontrada (Sin nombre de calle)";
                 }
             } catch (error) {
-                // Plan B por si falla el servidor de mapas gratuito
                 document.getElementById('regUbicacion').value = coordenadasReales;
-                window.mostrarNotificacion("⚠️ Se guardó el GPS, pero falló la traducción de texto.");
+                window.mostrarNotificacion("⚠️ Se guardó el GPS, pero falló la traducción.");
             }
         },
         (error) => { 
-            window.mostrarNotificacion("⚠️ GPS denegado. Escríbela manual."); 
-        }
+            window.mostrarNotificacion("⚠️ GPS denegado o sin señal. Escríbela manual."); 
+        },
+        // AQUÍ ESTÁ EL COMANDO PARA FORZAR LA LECTURA SATELITAL DIRECTA
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 } 
     );
 };
-
 window.registrarNegocio = async () => { 
     const btn = document.getElementById('btnRegister'); 
     const eDisplay = document.getElementById('regEmpresa').value.trim(); const z = document.getElementById('regZona').value.trim(); const u = document.getElementById('regUser').value.trim(); const em = document.getElementById('regEmail').value.trim().toLowerCase(); const p = document.getElementById('regPass').value.trim();
