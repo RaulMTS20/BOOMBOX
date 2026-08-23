@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yotobox-v2';
+const CACHE_NAME = 'yotobox-v3'; // Cambiamos la versión para forzar la actualización
 
 const urlsToCache = [
   '/',
@@ -7,24 +7,41 @@ const urlsToCache = [
   '/style.css'
 ];
 
+// FASE DE INSTALACIÓN
 self.addEventListener('install', event => {
+  self.skipWaiting(); // Obliga al celular a instalar esta nueva versión de inmediato
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache => cache.addAll(urlsToCache))
   );
 });
 
-// CACHÉ DINÁMICO: Guarda automáticamente Tailwind, Scanner y HTML2Canvas
+// FASE DE ACTIVACIÓN (El camión de basura)
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys().then(cacheNames => {
+      return Promise.all(
+        cacheNames.map(cacheName => {
+          // Si el caché viejo no se llama 'yotobox-v3', lo destruye
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+  self.clients.claim(); // Toma el control de la página sin tener que recargar
+});
+
+// FASE DE INTERCEPCIÓN (Modo Offline)
 self.addEventListener('fetch', event => {
-  // Ignoramos peticiones directas a la base de datos de Firebase para no corromperlas
   if (event.request.url.includes('firestore.googleapis.com') || event.request.url.includes('identitytoolkit')) {
       return;
   }
 
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+      if (cachedResponse) return cachedResponse;
+      
       return fetch(event.request).then(networkResponse => {
         if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic' && networkResponse.type !== 'cors') {
           return networkResponse;
@@ -35,7 +52,7 @@ self.addEventListener('fetch', event => {
         });
         return networkResponse;
       }).catch(() => {
-        // Falla silenciosa si no hay red, evita colapsar la app
+        // Falla silenciosa si no hay red
       });
     })
   );
