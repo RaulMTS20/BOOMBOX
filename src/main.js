@@ -140,6 +140,32 @@ window.cambiarPestaña = (idTab) => {
 window.alCambiarZona = () => { window.cargarInventarioGeneral(); if(!document.getElementById('tab-kardex').classList.contains('hidden')) window.cargarKardex(window.kardexActual); if(!document.getElementById('tab-reportes').classList.contains('hidden')) window.generarReporte(); };
 window.calcularPrecioExacto = (p, cantVenta) => { let pFinal = p.precio; if (p.precio_promo && p.precio_promo > 0) pFinal = p.precio_promo; if (p.cant_mayoreo > 0 && cantVenta >= p.cant_mayoreo && p.precio_mayoreo > 0) pFinal = p.precio_mayoreo; return pFinal; };
 
+// 📍 NUEVAS FUNCIONES REGISTRO (GIRO Y GPS)
+window.verificarGiro = () => { 
+    const giro = document.getElementById('regGiro').value; 
+    const inputVendedor = document.getElementById('regNumVendedor'); 
+    if(giro === 'Cambaceo') { 
+        inputVendedor.classList.remove('hidden'); 
+    } else { 
+        inputVendedor.classList.add('hidden'); 
+        inputVendedor.value = ''; 
+    } 
+};
+
+window.obtenerGPS = () => {
+    if (!navigator.geolocation) return window.mostrarNotificacion("❌ Tu navegador no soporta GPS.");
+    window.mostrarNotificacion("⏳ Buscando ubicación...");
+    navigator.geolocation.getCurrentPosition(
+        (position) => { 
+            document.getElementById('regUbicacion').value = `${position.coords.latitude}, ${position.coords.longitude}`; 
+            window.mostrarNotificacion("✅ GPS Capturado."); 
+        },
+        (error) => { 
+            window.mostrarNotificacion("⚠️ GPS denegado. Escríbela manual."); 
+        }
+    );
+};
+
 window.registrarNegocio = async () => { 
     const btn = document.getElementById('btnRegister'); const eDisplay = document.getElementById('regEmpresa').value.trim(); const z = document.getElementById('regZona').value.trim(); const u = document.getElementById('regUser').value.trim(); const em = document.getElementById('regEmail').value.trim().toLowerCase(); const p = document.getElementById('regPass').value.trim();
     if(!eDisplay || !z || !u || !em || !p) return window.mostrarNotificacion("⚠️ Llena todos los campos."); btn.innerText = "Creando base de datos..."; btn.disabled = true;
