@@ -19,13 +19,14 @@ const db = getFirestore(app);
 const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 const secondaryAuth = getAuth(secondaryApp);
 
-// 🔋 MOTOR OFFLINE (Persistencia de datos)
-enableIndexedDbPersistence(db).catch((err) => {
-    if (err.code == 'failed-precondition') {
-        console.warn("Modo Offline funciona solo en una pestaña.");
-    } else if (err.code == 'unimplemented') {
-        console.warn("Navegador no soporta Offline.");
-    }
+// 💽 MOTOR LOCAL-FIRST (DEXIE.JS)
+const localDB = new Dexie("YotoboxLocalDB");
+
+// Definición de las tablas locales y sus índices de búsqueda rápidos
+localDB.version(1).stores({
+    inventario: "sku, nombre, categoria, proveedor", // 'sku' es la Primary Key
+    ventas_pendientes: "++id, sku, cantidad, total, timestamp", // '++id' es un folio autoincrementable
+    configuracion: "clave, valor" // Para guardar estado de sesión offline
 });
 
 // ⚡ REGISTRO PWA SERVICE WORKER
@@ -249,9 +250,65 @@ window.detenerCamara = (m) => { if(scanners[m]) { scanners[m].stop().then(() => 
 
 function poblarFiltros() { let htmlCat = `<option value="Todas">Todas las categorías</option>`; window.categoriasUnicas.forEach(c => { if(c) htmlCat += `<option value="${c}">${c}</option>`; }); const els = ['filtro_inv_cat', 'alerta_filtro_cat', 'rep_cat']; els.forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = htmlCat; }); }
 
+// 🔄 PUENTE DE DESCARGA (NUBE -> LOCAL)
+window.sincronizarInventarioNube = async () => {
+    const z = document.getElementById('zonaSelect').value;
+    const e = localStorage.getItem('empresaId');
+    if(!z || !e) return;
+
+    window.mostrarNotificacion("⏳ Descargando inventario de la nube al disco local...");
+    
+    try {
+        // Descarga el 100% del catálogo sin paginación para el modo offline
+        const q = query(collection(db, `${e}_Inventario_${z}`));
+        const sn = await getDocs(q);
+        
+        const productosDescargados = [];
+        sn.forEach((d) => { productosDescargados.push(d.data()); });
+        
+        // Limpiamos Dexie e inyectamos la versión fresca
+        await localDB.inventario.clear();
+        await localDB.inventario.bulkPut(productosDescargados);
+        
+        window.mostrarNotificacion(`✅ ${productosDescargados.length} productos listos para uso Offline.`);
+        window.cargarInventarioGeneral(); // Recarga la pantalla
+    } catch (err) {
+        console.error(err);
+        window.mostrarNotificacion("❌ Error en la descarga inicial. Revisa tu internet.");
+    }
+};
+
+// 📦 INVENTARIO (LECTURA ULTRARRÁPIDA DESDE DEXIE.JS)
 window.cargarInventarioGeneral = async () => {
-    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); if(!z || !e) return; document.getElementById('tablaInventarioGeneralBody').innerHTML = "<tr><td colspan='7' class='p-8 text-center'>Cargando base de datos...</td></tr>";
-    try { const sn = await getDocs(collection(db, `${e}_Inventario_${z}`)); window.inventarioLocal = []; window.categoriasUnicas.clear(); sn.forEach((d) => { const p = d.data(); window.inventarioLocal.push(p); if(p.categoria) window.categoriasUnicas.add(p.categoria); }); poblarFiltros(); window.renderInventarioPantalla(); if(!document.getElementById('tab-agotados').classList.contains('hidden')) window.renderAgotados(); } catch(err) { document.getElementById('tablaInventarioGeneralBody').innerHTML = "<tr><td colspan='7' class='text-red-500 p-8'>Error al conectar</td></tr>"; }
+    const z = document.getElementById('zonaSelect').value; 
+    const e = localStorage.getItem('empresaId'); 
+    if(!z || !e) return; 
+    
+    document.getElementById('tablaInventarioGeneralBody').innerHTML = "<tr><td colspan='7' class='p-8 text-center font-bold text-orange-600'>Leyendo memoria ultrarrápida...</td></tr>"; 
+    
+    // Ocultamos el botón viejo de paginación porque Dexie lee todo al instante
+    const btnCargarMas = document.getElementById('btnCargarMasInventario');
+    if(btnCargarMas) btnCargarMas.classList.add('hidden'); 
+    
+    try { 
+        // 🚀 Consultamos el disco duro local, NO Firebase
+        window.inventarioLocal = await localDB.inventario.toArray();
+        
+        // Si el disco local está vacío y hay internet, disparamos la descarga
+        if(window.inventarioLocal.length === 0 && navigator.onLine) {
+            return window.sincronizarInventarioNube();
+        }
+
+        window.categoriasUnicas.clear(); 
+        window.inventarioLocal.forEach(p => { if(p.categoria) window.categoriasUnicas.add(p.categoria); }); 
+        
+        poblarFiltros(); 
+        window.renderInventarioPantalla(); 
+        if(!document.getElementById('tab-agotados').classList.contains('hidden')) window.renderAgotados(); 
+    } catch(err) { 
+        console.error(err); 
+        document.getElementById('tablaInventarioGeneralBody').innerHTML = "<tr><td colspan='7' class='text-red-500 p-8'>Error fatal al leer memoria local (Dexie).</td></tr>"; 
+    }
 };
 
 window.renderInventarioPantalla = () => {
