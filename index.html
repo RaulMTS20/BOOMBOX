@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BOOMBOX - Punto de Venta</title>
+    <title>YOTOBOX - Punto de Venta</title>
     
-    <!-- LIBRERÍAS PARA PWA Y TICKET EN IMAGEN -->
     <link rel="manifest" href="/manifest.json">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-    
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
@@ -28,11 +26,20 @@
     <!-- PANTALLA DE ACCESO -->
     <div id="authScreen" class="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-orange-500 to-amber-600">
         <div class="bg-white p-6 md:p-8 rounded-2xl shadow-2xl w-full max-w-md animate-fade-in">
+            
+            <!-- NUEVO LOGO YOTOBOX -->
             <div class="text-center mb-6">
-                <h1 class="text-3xl font-black text-orange-600 tracking-tight">💥 BOOMBOX</h1>
-                <p class="text-gray-500 text-sm mt-1">Control de Inventario Inteligente</p>
+                <div class="flex justify-center items-center font-black tracking-tighter">
+                    <span class="text-4xl text-orange-500">YOTOB</span>
+                    <svg class="w-12 h-12 text-black mx-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                    <span class="text-4xl text-orange-500">X</span>
+                </div>
+                <p class="text-gray-500 text-sm mt-1 font-bold">Control de Inventario Inteligente</p>
             </div>
 
+            <!-- LOGIN -->
             <div id="loginForm" class="space-y-4">
                 <div>
                     <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Usuario</label>
@@ -49,14 +56,39 @@
                 </div>
             </div>
 
-            <div id="registerForm" class="space-y-4 hidden">
+            <!-- REGISTRO AMPLIADO -->
+            <div id="registerForm" class="space-y-4 hidden h-96 overflow-y-auto p-1">
                 <input type="text" id="regEmpresa" class="w-full p-3 border-2 rounded-xl" placeholder="Nombre del Negocio">
-                <input type="text" id="regZona" class="w-full p-3 border-2 rounded-xl" placeholder="Primera Sucursal">
-                <input type="text" id="regUser" class="w-full p-3 border-2 rounded-xl" placeholder="Usuario">
-                <input type="email" id="regEmail" class="w-full p-3 border-2 rounded-xl" placeholder="Correo">
+                
+                <select id="regGiro" onchange="verificarGiro()" class="w-full p-3 border-2 rounded-xl text-gray-600 font-bold bg-white">
+                    <option value="">Selecciona tu Giro...</option>
+                    <option value="Abarrotes">Abarrotes / Minisuper</option>
+                    <option value="Ropa">Ropa / Calzado / Boutique</option>
+                    <option value="Alimentos">Comida / Restaurante</option>
+                    <option value="Ferreteria">Ferretería / Tlapalería</option>
+                    <option value="Cambaceo">Ventas por Cambaceo</option>
+                    <option value="Otro">Otro Giro</option>
+                </select>
+                <input type="text" id="regNumVendedor" class="w-full p-3 border-2 rounded-xl hidden" placeholder="Número de Vendedor asignado">
+
+                <!-- CAMPO GPS CON JUSTIFICACIÓN -->
+                <div class="bg-gray-50 p-3 rounded-xl border-2 border-gray-100">
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="regUbicacion" class="w-full p-2 border rounded-xl flex-1 text-sm" placeholder="Dirección o Ubicación">
+                        <button onclick="obtenerGPS()" class="px-4 py-2 bg-blue-100 text-blue-700 font-bold rounded-xl border border-blue-200" title="Usar mi ubicación GPS">📍 GPS</button>
+                    </div>
+                    <p class="text-[10px] text-gray-500 font-medium leading-tight">
+                        *Tus datos de ubicación nos ayudarán próximamente a brindarte sugerencias de precios basados en tu región para maximizar tus ganancias.
+                    </p>
+                </div>
+
+                <input type="text" id="regZona" class="w-full p-3 border-2 rounded-xl" placeholder="Primera Sucursal (Ej. Matriz)">
+                <input type="text" id="regUser" class="w-full p-3 border-2 rounded-xl" placeholder="Usuario (para Iniciar Sesión)">
+                <input type="email" id="regEmail" class="w-full p-3 border-2 rounded-xl" placeholder="Correo Electrónico">
                 <input type="password" id="regPass" class="w-full p-3 border-2 rounded-xl" placeholder="Contraseña">
-                <button id="btnRegister" onclick="registrarNegocio()" class="w-full py-3 bg-green-600 text-white font-bold rounded-xl">Crear Cuenta</button>
-                <button onclick="toggleAuth()" class="w-full text-xs font-bold text-gray-500">Regresar al inicio</button>
+                
+                <button id="btnRegister" onclick="registrarNegocio()" class="w-full py-3 bg-green-600 text-white font-bold rounded-xl mt-2">Crear Cuenta</button>
+                <button onclick="toggleAuth()" class="w-full text-xs font-bold text-gray-500 pb-4">Cancelar y regresar</button>
             </div>
         </div>
     </div>
@@ -65,13 +97,18 @@
     <div id="appScreen" class="hidden min-h-screen flex flex-col">
         <header class="bg-white border-b shadow-sm sticky top-0 z-40 p-3 md:p-4 flex justify-between items-center">
             <div class="flex items-center gap-3">
-                <span class="text-xl md:text-2xl font-black text-orange-600">💥 <span id="displayEmpresa">Negocio</span></span>
+                <!-- LOGO EN HEADER -->
+                <span class="text-xl md:text-2xl font-black text-orange-600 tracking-tighter hidden sm:inline-block">YOTOB<span class="text-black">📦</span>X</span>
+                <span id="badgePlan" class="text-[10px] bg-gray-200 text-gray-600 font-bold px-2 py-1 rounded">BÁSICO</span>
                 <select id="zonaSelect" onchange="alCambiarZona()" class="p-2 border-2 bg-gray-50 rounded-xl font-bold text-xs md:text-sm outline-none"></select>
                 <button id="btnAgregarZona" onclick="agregarNuevaZona()" class="hidden p-2 text-xs bg-gray-100 font-bold rounded-xl">+ Nueva Zona</button>
             </div>
-            <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 md:gap-4">
+                <div id="indicadorSync" class="hidden items-center gap-1 bg-yellow-100 text-yellow-700 px-3 py-1.5 rounded-xl font-bold text-xs border border-yellow-300">
+                    <span class="animate-spin inline-block">⏳</span> <span id="textoSync">Pendientes: 0</span>
+                </div>
                 <span id="displayUser" class="text-xs md:text-sm font-bold text-gray-600 bg-gray-100 px-3 py-1.5 rounded-xl">--</span>
-                <button onclick="cerrarSesion()" class="text-xs font-bold text-red-600 hover:underline">Cerrar Sesión</button>
+                <button onclick="cerrarSesion()" class="text-xs font-bold text-red-600 hover:underline">Salir</button>
             </div>
         </header>
 
@@ -115,14 +152,21 @@
             <div id="tab-general" class="tab-content hidden space-y-4 animate-fade-in">
                 <div class="bg-white p-4 rounded-2xl border space-y-4">
                     <div class="grid grid-cols-1 sm:grid-cols-4 gap-2">
-                        <input type="text" id="filtro_inv_txt" oninput="renderInventarioPantalla()" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="🔍 Buscar...">
+                        <input type="text" id="filtro_inv_txt" oninput="renderInventarioPantalla()" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="🔍 Buscar local...">
                         <select id="filtro_inv_cat" onchange="renderInventarioPantalla()" class="p-3 border-2 rounded-xl text-sm font-bold bg-gray-50"></select>
                         <select id="filtro_inv_ord" onchange="renderInventarioPantalla()" class="p-3 border-2 rounded-xl text-sm font-bold bg-gray-50">
                             <option value="nombre">Ordenar: A-Z</option><option value="stock_asc">Menor Stock</option><option value="stock_desc">Mayor Stock</option>
                         </select>
                         <button id="btnVaciarInventario" onclick="vaciarInventario()" class="hidden py-3 bg-red-50 text-red-600 font-bold rounded-xl border border-red-200">⚠️ Vaciar</button>
                     </div>
-                    <div class="overflow-x-auto rounded-xl border"><table class="w-full text-left text-sm"><thead class="bg-gray-800 text-white"><tr><th class="p-3 hidden">SKU</th><th class="p-3">Producto</th><th class="p-3">Categoría</th><th class="p-3 text-center">Stock</th><th class="p-3 text-left costo-col hidden">Costo</th><th class="p-3 text-left">Precio</th><th class="p-3 text-center accion-col hidden">Acciones</th></tr></thead><tbody id="tablaInventarioGeneralBody"></tbody></table></div>
+                    <div class="overflow-x-auto rounded-xl border">
+                        <table class="w-full text-left text-sm">
+                            <thead class="bg-gray-800 text-white"><tr><th class="p-3 hidden">SKU</th><th class="p-3">Producto</th><th class="p-3">Categoría</th><th class="p-3 text-center">Stock</th><th class="p-3 text-left costo-col hidden">Costo</th><th class="p-3 text-left">Precio</th><th class="p-3 text-center accion-col hidden">Acciones</th></tr></thead>
+                            <tbody id="tablaInventarioGeneralBody"></tbody>
+                        </table>
+                    </div>
+                    <!-- BOTÓN DE PAGINACIÓN -->
+                    <button id="btnCargarMasInventario" onclick="cargarMasInventario()" class="w-full py-3 mt-4 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl border transition hidden">⏬ Cargar más productos...</button>
                 </div>
             </div>
 
@@ -292,20 +336,13 @@
     <!-- MODAL DE VENTA EXITOSA Y TICKET -->
     <div id="modal-ticket" class="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-4 hidden">
         <div class="bg-white w-full max-w-sm rounded-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <!-- Encabezado -->
             <div class="bg-green-500 p-4 text-center text-white">
                 <h2 class="text-2xl font-black mb-1">✅ ¡Venta Exitosa!</h2>
-                <p class="text-sm opacity-90">Sincronización pendiente si estás offline</p>
+                <p class="text-sm opacity-90">Ticket generado correctamente</p>
             </div>
-
-            <!-- Contenedor del Ticket (Se convertirá en imagen) -->
             <div class="p-4 overflow-y-auto bg-gray-100 flex justify-center items-start">
-                <div id="ticket-visual" class="bg-white p-4 text-black w-[58mm] min-h-[100px] shadow-sm text-xs" style="font-family: monospace;">
-                    <!-- Aquí JavaScript inyectará el ticket -->
-                </div>
+                <div id="ticket-visual" class="bg-white p-4 text-black w-[58mm] min-h-[100px] shadow-sm text-xs" style="font-family: monospace;"></div>
             </div>
-
-            <!-- Botones de Acción -->
             <div class="p-4 bg-white border-t flex flex-col gap-3">
                 <button onclick="compartirTicket()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2">
                     <span>📤</span> Compartir a Impresora / WhatsApp

@@ -42,7 +42,7 @@ window.mostrarNotificacion = (mensaje) => {
     const cont = document.getElementById('toast-container'); const t = document.createElement('div'); t.className = 'toast'; t.innerText = mensaje; cont.appendChild(t); setTimeout(() => { if(t.parentNode) t.parentNode.removeChild(t); }, 2500);
 };
 
-// 🖨️ NUEVO CREADOR DE TICKET VISUAL PARA COMPARTIR (Sustituye la impresión directa)
+// 🖨️ NUEVO CREADOR DE TICKET VISUAL PARA COMPARTIR
 window.generarHTMLTicket = (carrito, total, empresa, zona, cajero, fecha) => {
     let totalItems = 0; carrito.forEach(i => totalItems += parseFloat(i.cantidad));
     
@@ -84,7 +84,7 @@ window.generarHTMLTicket = (carrito, total, empresa, zona, cajero, fecha) => {
     document.getElementById('ticket-visual').innerHTML = html;
 };
 
-// 📤 COMPARTIR COMO IMAGEN A LA IMPRESORA O WHATSAPP
+// 📤 COMPARTIR COMO IMAGEN (CON RECOLECTOR DE BASURA PARA LIBERAR RAM)
 window.compartirTicket = async () => {
     const elementoTicket = document.getElementById('ticket-visual');
     const btn = document.querySelector('button[onclick="compartirTicket()"]');
@@ -95,11 +95,20 @@ window.compartirTicket = async () => {
         canvas.toBlob(async (blob) => {
             const file = new File([blob], "recibo_yotobox.png", { type: "image/png" });
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ title: 'Recibo de Compra', text: 'Gracias por tu compra. Aquí tienes tu recibo.', files: [file] });
-            } else { window.mostrarNotificacion("Tu navegador no soporta enviar archivos directamente."); }
+                await navigator.share({ title: 'Recibo de Compra', text: 'Gracias por tu compra.', files: [file] });
+            } else { 
+                window.mostrarNotificacion("Tu navegador no soporta envío directo."); 
+            }
             btn.innerHTML = textoOriginal; btn.disabled = false;
+            
+            // GARBAGE COLLECTOR: Forzamos la limpieza de la memoria RAM eliminando el lienzo usado
+            canvas.width = 0; 
+            canvas.height = 0;
         }, 'image/png');
-    } catch (err) { console.error(err); window.mostrarNotificacion("Error al generar imagen."); btn.innerHTML = textoOriginal; btn.disabled = false; }
+    } catch (err) { 
+        console.error(err); window.mostrarNotificacion("Error al generar imagen."); 
+        btn.innerHTML = textoOriginal; btn.disabled = false; 
+    }
 };
 
 window.cerrarModalTicket = () => { document.getElementById('modal-ticket').classList.add('hidden'); document.getElementById('venta_busqueda').focus(); };
@@ -216,7 +225,7 @@ window.renderCarrito = () => {
     }); document.getElementById('gran-total').innerText = `$${t.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
 };
 
-// 💰 COBRO Y LLAMADO AL MODAL (100% OFFLINE)
+// 💰 COBRO (OPTIMIZADO PARA EVITAR CONGELAMIENTO DEL EVENT LOOP)
 window.procesarVentaCompleta = async () => {
     if (window.carrito.length === 0) return window.mostrarNotificacion("⚠️ El carrito está vacío."); 
     const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando..."; 
@@ -228,16 +237,14 @@ window.procesarVentaCompleta = async () => {
             const ref = doc(db, `${e}_Inventario_${z}`, i.sku); 
             const nuevoStock = i.stock - i.cantidad;
             
-            // Registros sin await para no trabarse sin internet
-            setDoc(ref, { stock: nuevoStock }, { merge: true }); 
-            addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts }); 
+            // Agregamos .catch(()=>{}) para absorber errores de red y evitar bloqueos en procesador
+            setDoc(ref, { stock: nuevoStock }, { merge: true }).catch(()=>{}); 
+            addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts }).catch(()=>{}); 
             
-            // Actualizar tabla local
             let itemLocal = window.inventarioLocal.find(x => x.sku === i.sku);
             if(itemLocal) itemLocal.stock = nuevoStock;
         }
         
-        // Abrir Modal de Ticket
         window.generarHTMLTicket(window.carrito, tot, eNombre, z, u, f);
         document.getElementById('modal-ticket').classList.remove('hidden');
 
@@ -245,7 +252,10 @@ window.procesarVentaCompleta = async () => {
         if(!document.getElementById('tab-agotados').classList.contains('hidden')) window.renderAgotados();
         
         btn.disabled = false; btn.innerText = "✅ Cobrar"; 
-    } catch(er) { console.error(er); window.mostrarNotificacion("❌ Ocurrió un error."); btn.disabled = false; btn.innerText = "✅ Cobrar"; } 
+    } catch(er) { 
+        console.error(er); window.mostrarNotificacion("❌ Ocurrió un error."); 
+        btn.disabled = false; btn.innerText = "✅ Cobrar"; 
+    } 
 };
 
 window.renderAgotados = () => {
