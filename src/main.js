@@ -20,10 +20,10 @@ const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 const secondaryAuth = getAuth(secondaryApp);
 
 // 💽 MOTOR LOCAL-FIRST (DEXIE.JS)
-//const localDB = new Dexie("YotoboxLocalDB");
+window.localDB = new Dexie("YotoboxLocalDB");
 
 // Definición de las tablas locales y sus índices de búsqueda rápidos
-localDB.version(1).stores({
+window.localDB.version(1).stores({
     inventario: "sku, nombre, categoria, proveedor", // 'sku' es la Primary Key
     ventas_pendientes: "++id, sku, cantidad, total, timestamp", // '++id' es un folio autoincrementable
     configuracion: "clave, valor" // Para guardar estado de sesión offline
@@ -263,19 +263,18 @@ window.sincronizarInventarioNube = async () => {
     window.mostrarNotificacion("⏳ Descargando inventario de la nube al disco local...");
     
     try {
-        // Descarga el 100% del catálogo sin paginación para el modo offline
         const q = query(collection(db, `${e}_Inventario_${z}`));
         const sn = await getDocs(q);
         
         const productosDescargados = [];
         sn.forEach((d) => { productosDescargados.push(d.data()); });
         
-        // Limpiamos Dexie e inyectamos la versión fresca
-        await localDB.inventario.clear();
-        await localDB.inventario.bulkPut(productosDescargados);
+        // AQUÍ ESTÁ EL CAMBIO (window.localDB)
+        await window.localDB.inventario.clear();
+        await window.localDB.inventario.bulkPut(productosDescargados);
         
         window.mostrarNotificacion(`✅ ${productosDescargados.length} productos listos para uso Offline.`);
-        window.cargarInventarioGeneral(); // Recarga la pantalla
+        window.cargarInventarioGeneral(); 
     } catch (err) {
         console.error(err);
         window.mostrarNotificacion("❌ Error en la descarga inicial. Revisa tu internet.");
@@ -290,15 +289,13 @@ window.cargarInventarioGeneral = async () => {
     
     document.getElementById('tablaInventarioGeneralBody').innerHTML = "<tr><td colspan='7' class='p-8 text-center font-bold text-orange-600'>Leyendo memoria ultrarrápida...</td></tr>"; 
     
-    // Ocultamos el botón viejo de paginación porque Dexie lee todo al instante
     const btnCargarMas = document.getElementById('btnCargarMasInventario');
     if(btnCargarMas) btnCargarMas.classList.add('hidden'); 
     
     try { 
-        // 🚀 Consultamos el disco duro local, NO Firebase
-        window.inventarioLocal = await localDB.inventario.toArray();
+        // AQUÍ ESTÁ EL CAMBIO (window.localDB)
+        window.inventarioLocal = await window.localDB.inventario.toArray();
         
-        // Si el disco local está vacío y hay internet, disparamos la descarga
         if(window.inventarioLocal.length === 0 && navigator.onLine) {
             return window.sincronizarInventarioNube();
         }
