@@ -229,11 +229,12 @@ window.cerrarSesion = () => { localStorage.clear(); location.reload(); };
 function iniciarApp() {
     try {
         document.getElementById('authScreen').classList.add('hidden'); document.getElementById('appScreen').classList.remove('hidden');
-        const eId = localStorage.getItem('empresaId') || "Negocio"; const eNombre = localStorage.getItem('empresaNombre') || eId; const u = localStorage.getItem('currentUser') || "Usuario"; const r = localStorage.getItem('userRol') || "Vendedor"; 
-        let zs = []; try { zs = JSON.parse(localStorage.getItem('zonas') || "[]"); if (!Array.isArray(zs) || zs.length === 0) zs = ["General"]; } catch(e) { zs = ["General"]; }
-        document.getElementById('displayEmpresa').innerText = eNombre; document.getElementById('displayUser').innerText = `${u} (${r})`; const sZ = document.getElementById('zonaSelect'); sZ.innerHTML = ""; zs.forEach(z => sZ.add(new Option(z, z)));
-        if (r === 'Dueño' || r === 'Gerente') { ['btn-tab-registro','btn-tab-kardex','btn-tab-reportes','btn-tab-agotados','btn-tab-proveedores','btn-tab-orden','btnAgregarZona'].forEach(id => { const btnRef = document.getElementById(id); if(btnRef) btnRef.classList.remove('hidden'); }); document.querySelectorAll('.costo-col').forEach(el => el.classList.remove('hidden')); document.querySelectorAll('.accion-col').forEach(el => el.classList.remove('hidden')); } else { document.querySelectorAll('.costo-col').forEach(el => el.classList.add('hidden')); document.querySelectorAll('.accion-col').forEach(el => el.classList.add('hidden')); }
-        if (r === 'Dueño') { document.getElementById('btn-tab-usuarios').classList.remove('hidden'); document.getElementById('btnVaciarInventario').classList.remove('hidden'); }
+    // Actualización segura de la interfaz (Evita colapsos si falta el HTML)
+const lblEmpresa = document.getElementById('displayEmpresa');
+if (lblEmpresa) lblEmpresa.innerText = eNombre;
+
+const lblUsuario = document.getElementById('displayUsuario');
+if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuario";
         window.cargarInventarioGeneral(); window.cargarProveedores(); window.cambiarPestaña('tab-ventas'); 
     } catch (err) { 
             console.error("💥 ERROR FATAL REVELADO:", err); 
