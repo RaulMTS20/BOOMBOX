@@ -20,7 +20,7 @@ const secondaryApp = initializeApp(firebaseConfig, "SecondaryApp");
 const secondaryAuth = getAuth(secondaryApp);
 
 // 💽 MOTOR LOCAL-FIRST (DEXIE.JS)
-const localDB = new Dexie("YotoboxLocalDB");
+//const localDB = new Dexie("YotoboxLocalDB");
 
 // Definición de las tablas locales y sus índices de búsqueda rápidos
 localDB.version(1).stores({
@@ -235,8 +235,12 @@ function iniciarApp() {
         if (r === 'Dueño' || r === 'Gerente') { ['btn-tab-registro','btn-tab-kardex','btn-tab-reportes','btn-tab-agotados','btn-tab-proveedores','btn-tab-orden','btnAgregarZona'].forEach(id => { const btnRef = document.getElementById(id); if(btnRef) btnRef.classList.remove('hidden'); }); document.querySelectorAll('.costo-col').forEach(el => el.classList.remove('hidden')); document.querySelectorAll('.accion-col').forEach(el => el.classList.remove('hidden')); } else { document.querySelectorAll('.costo-col').forEach(el => el.classList.add('hidden')); document.querySelectorAll('.accion-col').forEach(el => el.classList.add('hidden')); }
         if (r === 'Dueño') { document.getElementById('btn-tab-usuarios').classList.remove('hidden'); document.getElementById('btnVaciarInventario').classList.remove('hidden'); }
         window.cargarInventarioGeneral(); window.cargarProveedores(); window.cambiarPestaña('tab-ventas'); 
-    } catch (err) { window.cerrarSesion(); }
-}
+    } catch (err) { 
+            console.error("💥 ERROR FATAL REVELADO:", err); 
+            // window.cerrarSesion(); 
+        }
+    }
+
 
 let scanners = { ventas: null, ingreso: null };
 window.iniciarCamara = (m) => { 
