@@ -248,9 +248,24 @@ if (lblEmpresa) lblEmpresa.innerText = eNombre;
                 selectZona.appendChild(opcion);
             });
         }
-        
+
 const lblUsuario = document.getElementById('displayUsuario');
 if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuario";
+// 🔐 VALIDACIÓN DE ROLES Y PERMISOS (Restaurada y a prueba de fallos)
+        const rolActual = localStorage.getItem('userRol');
+        
+        if (rolActual === 'Dueño' || rolActual === 'Gerente') {
+            ['btn-tab-registro', 'btn-tab-kardex', 'btn-tab-reportes'].forEach(id => {
+                const boton = document.getElementById(id);
+                if (boton) boton.classList.remove('hidden');
+            });
+        }
+        
+        if (rolActual === 'Dueño') {
+            const botonUsuarios = document.getElementById('btn-tab-usuarios');
+            if (botonUsuarios) botonUsuarios.classList.remove('hidden');
+        }
+        
         window.cargarInventarioGeneral(); window.cargarProveedores(); window.cambiarPestaña('tab-ventas'); 
     } catch (err) { 
             console.error("💥 ERROR FATAL REVELADO:", err); 
