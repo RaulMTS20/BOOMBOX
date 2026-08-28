@@ -265,7 +265,7 @@ if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuar
             const botonUsuarios = document.getElementById('btn-tab-usuarios');
             if (botonUsuarios) botonUsuarios.classList.remove('hidden');
         }
-        
+
         window.cargarInventarioGeneral(); window.cargarProveedores(); window.cambiarPestaña('tab-ventas'); 
     } catch (err) { 
             console.error("💥 ERROR FATAL REVELADO:", err); 
@@ -451,7 +451,25 @@ window.descargarCSV = () => { if(window.datosReporteCSV.length <= 1) return wind
 window.cargarKardex = async (tipo = 'entradas') => { window.kardexActual = tipo; document.getElementById('btn-kardex-entradas').className = tipo === 'entradas' ? 'px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; document.getElementById('btn-kardex-salidas').className = tipo === 'salidas' ? 'px-4 py-2 font-bold text-red-600 border-b-4 border-red-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaKardexBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando...</td></tr>"; let movs = []; try { if (tipo === 'entradas') { const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); const iSn = await getDocs(qIngresos); iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); } else { const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); vSn.forEach(d => { movs.push({...d.data(), tipo: 'SALIDA'}); }); } movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); const movsRecientes = movs.slice(0, 100); let h = ""; movsRecientes.forEach(m => { let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; } if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; } const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad; h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`; }); tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>Sin movimientos.</td></tr>`; } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error</td></tr>`; } };
 
 window.crearUsuarioSecundario = async () => { const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; const empId = localStorage.getItem('empresaId'); const empNom = localStorage.getItem('empresaNombre') || empId; const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!u || !p || !em) return window.mostrarNotificacion("⚠️ Llena todos los datos"); try { const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: empId, empresaNombre: empNom, rol: r, zonas: zn, usuario: u }); window.mostrarNotificacion(`✅ Creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); } catch(er) { window.mostrarNotificacion("❌ Error."); } };
-window.cargarUsuarios = async () => { const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaUsuariosBody'); tb.innerHTML = '<tr><td colspan="3" class="text-center p-8">Cargando...</td></tr>'; try { const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); const sn = await getDocs(q); let h = ''; sn.forEach(d => { const u = d.data(); const zonasStr = (u.zonas && Array.isArray(u.zonas)) ? u.zonas.join(', ') : 'Sin zona asignada'; h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${zonasStr}</td></tr>`; }); tb.innerHTML = h || '<tr><td colspan="3" class="text-center p-8">Sin usuarios</td></tr>'; } catch(er) { tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error</td></tr>`; } };
+window.cargarUsuarios = async () => { 
+    const e = localStorage.getItem('empresaId'); 
+    const tb = document.getElementById('tablaUsuariosBody'); 
+    tb.innerHTML = '<tr><td colspan="3" class="text-center p-8">Cargando...</td></tr>'; 
+    try { 
+        const q = query(collection(db, "SaaS_Usuarios"), where("empresaId", "==", e)); 
+        const sn = await getDocs(q); 
+        let h = ''; 
+        sn.forEach(d => { 
+            const u = d.data(); 
+            const zonasStr = (u.zonas && Array.isArray(u.zonas)) ? u.zonas.join(', ') : 'Sin zona asignada'; 
+            h += `<tr class="border-b hover:bg-blue-50 transition"><td class="p-3 font-bold">${u.usuario || d.id}</td><td class="p-3 font-bold ${u.rol==='Dueño'?'text-blue-600':'text-green-600'}">${u.rol}</td><td class="p-3 text-gray-500">${zonasStr}</td></tr>`; 
+        }); 
+        tb.innerHTML = h || '<tr><td colspan="3" class="text-center p-8">Sin usuarios</td></tr>'; 
+    } catch(er) { 
+        console.error("💥 ERROR REVELADO AL LEER USUARIOS:", er); // ESTA ES LA REPARACIÓN
+        tb.innerHTML = `<tr><td colspan="3" class="text-center text-red-500 p-8">Error</td></tr>`; 
+    } 
+};
 window.agregarNuevaZona = async () => { const nZ = prompt("Nombre de la nueva zona:"); if(nZ) { const u = localStorage.getItem('currentUser'); const z = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!z.includes(nZ)) { z.push(nZ); await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); localStorage.setItem('zonas', JSON.stringify(z)); window.mostrarNotificacion("✅ Agregada."); setTimeout(() => { location.reload(); }, 1500); } else { window.mostrarNotificacion("⚠️ Ya existe."); } } };
 
 if(localStorage.getItem('currentUser')) { iniciarApp(); }
