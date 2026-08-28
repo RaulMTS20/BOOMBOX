@@ -232,7 +232,23 @@ function iniciarApp() {
     // Actualización segura de la interfaz (Evita colapsos si falta el HTML)
 const lblEmpresa = document.getElementById('displayEmpresa');
 if (lblEmpresa) lblEmpresa.innerText = eNombre;
-
+// Llenar el botón desplegable con las sucursales (zonas)
+        const selectZona = document.getElementById('zonaSelect');
+        if (selectZona) {
+            selectZona.innerHTML = ""; // Limpia el botón por si hay basura
+            let zonasGuardadas = [];
+            try { 
+                zonasGuardadas = JSON.parse(localStorage.getItem('zonas') || "[]"); 
+            } catch(e) {}
+            
+            zonasGuardadas.forEach(zona => {
+                const opcion = document.createElement('option');
+                opcion.value = zona;
+                opcion.text = zona;
+                selectZona.appendChild(opcion);
+            });
+        }
+        
 const lblUsuario = document.getElementById('displayUsuario');
 if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuario";
         window.cargarInventarioGeneral(); window.cargarProveedores(); window.cambiarPestaña('tab-ventas'); 
