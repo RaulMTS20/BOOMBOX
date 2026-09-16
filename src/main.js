@@ -357,7 +357,20 @@ window.renderInventarioPantalla = () => {
 };
 window.eliminarProducto = async (sku) => {
     if(!confirm(`⚠️ ¿ELIMINAR ${sku}?`)) return; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser');
-    try { const pRef = doc(db, `${e}_Inventario_${z}`, sku); const pSnap = await getDoc(pRef); if(pSnap.exists()) { await deleteDoc(pRef); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: pSnap.data().nombre, cantidad: pSnap.data().stock, zona: z, usuario: u, fechaRegistro: new Date().toLocaleString('es-MX'), timestamp: Date.now(), tipoMovimiento: "ELIMINACIÓN" }); window.mostrarNotificacion("🗑️ Eliminado"); window.cargarInventarioGeneral(); } } catch(er) {}
+    try { 
+        const pRef = doc(db, `${e}_Inventario_${z}`, sku); 
+        const pSnap = await getDoc(pRef); 
+        if(pSnap.exists()) { 
+            await deleteDoc(pRef); 
+            await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: pSnap.data().nombre, cantidad: pSnap.data().stock, zona: z, usuario: u, fechaRegistro: new Date().toLocaleString('es-MX'), timestamp: Date.now(), tipoMovimiento: "ELIMINACIÓN" }); 
+            
+            // 🚀 REPARACIÓN: Borrar de la memoria local (Dexie.js)
+            await window.localDB.inventario.delete(sku);
+            
+            window.mostrarNotificacion("🗑️ Eliminado"); 
+            window.cargarInventarioGeneral(); 
+        } 
+    } catch(er) {}
 };
 window.filtrarProductosVenta = () => {
     const i = document.getElementById('venta_busqueda').value.toLowerCase(); const c = document.getElementById('sugerencias_venta'); c.innerHTML = ''; if (i.length < 1) { c.classList.add('hidden'); return; }
@@ -434,12 +447,43 @@ window.eliminarProveedor = async (id) => { if(!confirm("¿Borrar este proveedor?
 
 window.guardarProducto = async () => {
     const sku = document.getElementById('p_sku').value.trim(); const nom = document.getElementById('p_nom').value.trim(); const cat = document.getElementById('p_cat').value.trim() || "General"; const prov = document.getElementById('p_prov')?.value || ""; const cos = parseFloat(document.getElementById('p_cos').value) || 0; const pre = parseFloat(document.getElementById('p_pre').value) || 0; const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('p_stk').value) || 0; const minS = parseFloat(document.getElementById('p_min').value) || 0; const maxS = parseFloat(document.getElementById('p_max').value) || 0; const isGranel = document.getElementById('p_granel').checked; const cad = document.getElementById('p_caducidad').value || null; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); if(!sku || !nom) return window.mostrarNotificacion("⚠️ SKU y Nombre obligatorios.");
-    try { const r = `${e}_Inventario_${z}`; const d = await getDoc(doc(db, r, sku)); let sF = stk; if (d.exists()) sF += d.data().stock; await setDoc(doc(db, r, sku), { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0 }, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); 
-    await window.actualizarCatalogoGlobal(sku, nom, cos); window.mostrarNotificacion("📦 Producto ingresado correctamente"); ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; document.getElementById('p_granel').checked = false; window.cargarInventarioGeneral(); } catch (err) {}
+    try { 
+        const r = `${e}_Inventario_${z}`; 
+        const d = await getDoc(doc(db, r, sku)); 
+        let sF = stk; if (d.exists()) sF += d.data().stock; 
+        const nuevoProducto = { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0 };
+        
+        await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); 
+        await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); 
+        await window.actualizarCatalogoGlobal(sku, nom, cos); 
+        
+        // 🚀 REPARACIÓN: Actualizar la memoria local (Dexie.js)
+        await window.localDB.inventario.put(nuevoProducto);
+        
+        window.mostrarNotificacion("📦 Producto ingresado correctamente"); 
+        ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); 
+        if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; document.getElementById('p_granel').checked = false; 
+        window.cargarInventarioGeneral(); 
+    } catch (err) {}
 };
 window.abrirModalEdicion = (sku) => { const p = window.inventarioLocal.find(x => x.sku === sku); if(!p) return; document.getElementById('edit_sku').value = p.sku; document.getElementById('edit_nom').value = p.nombre; document.getElementById('edit_cat').value = p.categoria || "General"; if(document.getElementById('edit_prov')) document.getElementById('edit_prov').value = p.proveedor || ""; document.getElementById('edit_cos').value = p.costo||0; document.getElementById('edit_pre').value = p.precio||0; document.getElementById('edit_promo').value = p.precio_promo || 0; document.getElementById('edit_mayoreo').value = p.precio_mayoreo || 0; document.getElementById('edit_cant_mayoreo').value = p.cant_mayoreo || 0; document.getElementById('edit_stk').value = p.stock||0; document.getElementById('edit_min').value = p.min_stk || 0; document.getElementById('edit_max').value = p.max_stk || 0; document.getElementById('edit_granel').checked = p.es_granel || false; document.getElementById('edit_caducidad').value = p.caducidad || ""; document.getElementById('modalEdicion').classList.remove('hidden'); };
 window.cerrarModalEdicion = () => { document.getElementById('modalEdicion').classList.add('hidden'); };
-window.guardarEdicionProducto = async () => { const sku = document.getElementById('edit_sku').value; const nom = document.getElementById('edit_nom').value.trim(); const cat = document.getElementById('edit_cat').value.trim() || "General"; const prov = document.getElementById('edit_prov')?.value || ""; const cos = parseFloat(document.getElementById('edit_cos').value) || 0; const pre = parseFloat(document.getElementById('edit_pre').value) || 0; const promo = parseFloat(document.getElementById('edit_promo').value) || 0; const pMay = parseFloat(document.getElementById('edit_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('edit_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('edit_stk').value) || 0; const minS = parseFloat(document.getElementById('edit_min').value) || 0; const maxS = parseFloat(document.getElementById('edit_max').value) || 0; const isGranel = document.getElementById('edit_granel').checked; const cad = document.getElementById('edit_caducidad').value || null; if(!nom) return window.mostrarNotificacion("⚠️ El nombre es obligatorio."); const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); try { let updates = { nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_promo: promo, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: stk, min_stk: minS, max_stk: maxS, caducidad: cad }; await setDoc(doc(db, `${e}_Inventario_${z}`, sku), updates, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "AJUSTE" }); window.mostrarNotificacion("✅ Producto actualizado"); window.cerrarModalEdicion(); window.cargarInventarioGeneral(); } catch(err) {} };
+window.guardarEdicionProducto = async () => { 
+    const sku = document.getElementById('edit_sku').value; const nom = document.getElementById('edit_nom').value.trim(); const cat = document.getElementById('edit_cat').value.trim() || "General"; const prov = document.getElementById('edit_prov')?.value || ""; const cos = parseFloat(document.getElementById('edit_cos').value) || 0; const pre = parseFloat(document.getElementById('edit_pre').value) || 0; const promo = parseFloat(document.getElementById('edit_promo').value) || 0; const pMay = parseFloat(document.getElementById('edit_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('edit_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('edit_stk').value) || 0; const minS = parseFloat(document.getElementById('edit_min').value) || 0; const maxS = parseFloat(document.getElementById('edit_max').value) || 0; const isGranel = document.getElementById('edit_granel').checked; const cad = document.getElementById('edit_caducidad').value || null; if(!nom) return window.mostrarNotificacion("⚠️ El nombre es obligatorio."); const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); 
+    try { 
+        let updates = { nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_promo: promo, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: stk, min_stk: minS, max_stk: maxS, caducidad: cad }; 
+        await setDoc(doc(db, `${e}_Inventario_${z}`, sku), updates, { merge: true }); 
+        await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "AJUSTE" }); 
+        
+        // 🚀 REPARACIÓN: Actualizar la memoria local (Dexie.js)
+        const objLocal = await window.localDB.inventario.get(sku) || {};
+        await window.localDB.inventario.put({ ...objLocal, ...updates, sku: sku });
+        
+        window.mostrarNotificacion("✅ Producto actualizado"); 
+        window.cerrarModalEdicion(); 
+        window.cargarInventarioGeneral(); 
+    } catch(err) {} 
+};
 window.procesarArchivoMasivo = function() { const i = document.getElementById('archivoInventario'); const s = document.getElementById('statusCargaMasiva'); const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); if (!i.files || i.files.length === 0) return; const a = i.files[0]; const l = new FileReader(); s.classList.remove('hidden'); s.className = "mt-4 p-4 bg-blue-50 text-blue-700 rounded-lg font-bold"; s.innerText = "⏳ Sincronizando..."; l.onload = async function(ev) { const c = ev.target.result; let pr = 0; const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); try { let batch = writeBatch(db); let opCount = 0; const commitBatch = async () => { if(opCount > 0) { await batch.commit(); batch = writeBatch(db); opCount = 0; } }; const procesarItem = async (sku, nom, stk, cos, pre) => { batch.set(doc(db, `${e}_Inventario_${z}`, sku), { sku, nombre: nom, costo: cos, precio: pre, stock: stk, zona: z, categoria: "General", proveedor: "", min_stk: 0, max_stk: 0, precio_promo: 0, precio_mayoreo: 0, cant_mayoreo: 0, es_granel: false, caducidad: null }, {merge:true}); opCount++; if(stk > 0) { batch.set(doc(collection(db, `${e}_Historial_Ingresos`)), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); opCount++; } if(opCount > 400) await commitBatch(); }; if (a.name.endsWith('.xml')) { const xm = new DOMParser().parseFromString(c, "text/xml"); const it = xm.getElementsByTagName("item"); for (let j = 0; j < it.length; j++) { const item = it[j]; const sku = item.getElementsByTagName("value0")[0]?.textContent?.trim() || ""; if (!sku) continue; const nom = item.getElementsByTagName("value1")[0]?.textContent?.trim() || ""; const stk = parseFloat(item.getElementsByTagName("value2")[0]?.textContent?.trim() || "0"); const nC = item.getElementsByTagName("value3")[0]?.textContent?.trim() || ""; let cos = 0; let pre = 0; if(nC) { const p = nC.split('?'); const eN = (str) => { const m = str.match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : 0; }; cos = eN(p[0]); pre = p.length > 1 ? eN(p[1]) : cos; if (pre === 0) pre = cos; } await procesarItem(sku, nom, stk, cos, pre); pr++; } } else if (a.name.endsWith('.txt')) { const ln = c.split('\n'); for (let li of ln) { const col = li.trim().split(','); if (col.length >= 5 && col[0].trim()) { await procesarItem(col[0].trim(), col[1].trim(), parseFloat(col[4])||0, parseFloat(col[2])||0, parseFloat(col[3])||0); pr++; } } } await commitBatch(); s.className = "mt-4 p-4 bg-green-50 text-green-700 rounded-lg font-bold"; s.innerText = `✅ Carga Exitosa! ${pr} productos cargados.`; window.cargarInventarioGeneral(); } catch (er) { s.className = "mt-4 p-4 bg-red-50 text-red-700 rounded-lg"; s.innerText = "❌ Error en archivo."; } }; l.readAsText(a); };
 window.vaciarInventario = async () => { const z = document.getElementById('zonaSelect').value; const p = prompt(`Precaución. Escribe VACIAR para borrar toda la zona ${z}:`); if(p !== 'VACIAR') return; try { const sn = await getDocs(collection(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`)); sn.forEach(async (d) => { await deleteDoc(doc(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`, d.id)); }); window.mostrarNotificacion("✅ Inventario borrado."); window.cargarInventarioGeneral(); } catch(e) {} };
 
@@ -481,8 +525,27 @@ window.guardarRegistroRapido = async () => {
     if (!sku || !nom || pre <= 0) { return window.mostrarNotificacion('⚠️ Datos inválidos.'); }
     const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX');
     const btn = document.querySelector('#modal-registro-rapido button[onclick="guardarRegistroRapido()"]'); const btnOriginalText = btn.innerHTML; btn.innerHTML = '⏳ Guardando...'; btn.disabled = true;
-    try { const nuevoProducto = { sku: sku, nombre: nom, categoria: "General", proveedor: "", costo: cos, precio: pre, precio_mayoreo: 0, cant_mayoreo: 0, es_granel: false, stock: 0, min_stk: 0, max_stk: 0, caducidad: null, zona: z, precio_promo: 0 };
-        const r = `${e}_Inventario_${z}`; await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku: sku, nombre: nom, cantidad: 0, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA_EXPRESS" });
-        await window.actualizarCatalogoGlobal(sku, nom, cos); window.inventarioLocal.push(nuevoProducto); window.cerrarModalRegistroRapido(); document.getElementById('venta_busqueda').value = ''; const productoParaCarrito = { ...nuevoProducto, stock: 9999 }; window.agregarAlCarrito(productoParaCarrito); window.mostrarNotificacion('✅ Guardado.');
-    } catch (error) { window.mostrarNotificacion('❌ Error.'); } finally { btn.innerHTML = btnOriginalText; btn.disabled = false; }
+    
+    try { 
+        const nuevoProducto = { sku: sku, nombre: nom, categoria: "General", proveedor: "", costo: cos, precio: pre, precio_mayoreo: 0, cant_mayoreo: 0, es_granel: false, stock: 0, min_stk: 0, max_stk: 0, caducidad: null, zona: z, precio_promo: 0 };
+        const r = `${e}_Inventario_${z}`; 
+        
+        await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); 
+        await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku: sku, nombre: nom, cantidad: 0, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA_EXPRESS" });
+        await window.actualizarCatalogoGlobal(sku, nom, cos); 
+        
+        // 🚀 REPARACIÓN: Actualizar la memoria local ultrarrápida (Dexie.js)
+        await window.localDB.inventario.put(nuevoProducto);
+        
+        window.inventarioLocal.push(nuevoProducto); 
+        window.cerrarModalRegistroRapido(); 
+        document.getElementById('venta_busqueda').value = ''; 
+        const productoParaCarrito = { ...nuevoProducto, stock: 9999 }; 
+        window.agregarAlCarrito(productoParaCarrito); 
+        window.mostrarNotificacion('✅ Guardado.');
+    } catch (error) { 
+        window.mostrarNotificacion('❌ Error.'); 
+    } finally { 
+        btn.innerHTML = btnOriginalText; btn.disabled = false; 
+    }
 };
