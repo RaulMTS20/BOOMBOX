@@ -118,8 +118,8 @@
             <button id="btn-tab-ventas" onclick="cambiarPestaña('tab-ventas')" class="px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">🛒 Ventas</button>
             <button id="btn-tab-general" onclick="cambiarPestaña('tab-general')" class="px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📦 Inventario</button>
             <button id="btn-tab-registro" onclick="cambiarPestaña('tab-registro')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📥 Bodega</button>
-            <button id="btn-tab-agotados" onclick="cambiarPestaña('tab-agotados')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">⚠️ Alertas Stock</button>
-            <button id="btn-tab-orden" onclick="abrirPestañaOrden()" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📝 Lista de Pedido</button>
+            <button id="btn-tab-agotados" onclick="cambiarPestaña('tab-agotados')" class="px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">⚠️ Alertas Stock</button>
+            <button id="btn-tab-orden" onclick="abrirPestañaOrden()" class="px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📝 Lista de Pedido</button>
             <button id="btn-tab-proveedores" onclick="cambiarPestaña('tab-proveedores')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">🚚 Proveedores</button>
             <button id="btn-tab-kardex" onclick="cambiarPestaña('tab-kardex')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📋 Kardex</button>
             <button id="btn-tab-reportes" onclick="cambiarPestaña('tab-reportes')" class="hidden px-4 py-3 font-black text-sm text-gray-600 border-b-4 border-transparent">📈 Reportes</button>
@@ -143,9 +143,22 @@
                         <h2 class="text-lg font-black border-b pb-2">🛒 Lista de Cobro</h2>
                         <div class="overflow-y-auto max-h-72 flex-1"><table class="w-full text-left"><tbody id="tabla-carrito"><tr><td class="text-center text-gray-400 py-8">El carrito está vacío</td></tr></tbody></table></div>
                         <div class="border-t pt-4 space-y-3">
-                            <div class="flex justify-between items-center"><span class="font-bold text-xs">Total:</span><span id="gran-total" class="text-3xl font-black text-green-600">$0.00</span></div>
-                            <button id="btn-cobrar" onclick="procesarVentaCompleta()" class="w-full bg-green-500 text-white font-bold text-xl py-4 rounded-xl shadow-lg mt-4 hover:bg-green-600 transition">✅ Cobrar</button>
-                        </div>
+    <!-- Calculadora de Cambio -->
+    <div class="flex justify-between items-center mb-2">
+        <label class="text-gray-700 font-bold text-xs uppercase">Efectivo:</label>
+        <div class="flex items-center">
+            <span class="text-gray-500 mr-1 font-bold">$</span>
+            <input type="number" id="cobro_efectivo" class="border-2 border-gray-300 rounded-lg w-24 p-2 text-right font-bold focus:ring-2 focus:ring-orange-500 outline-none" placeholder="0.00" onkeyup="window.calcularCambio()" onchange="window.calcularCambio()">
+        </div>
+    </div>
+    <div class="flex justify-between items-center bg-gray-50 p-2 rounded-lg mb-2">
+        <label class="text-gray-700 font-bold text-xs uppercase">Cambio:</label>
+        <span id="cobro_cambio" class="text-xl font-black text-blue-600">$0.00</span>
+    </div>
+
+    <div class="flex justify-between items-center"><span class="font-bold text-xs">Total:</span><span id="gran-total" class="text-3xl font-black text-green-600">$0.00</span></div>
+    <button id="btn-cobrar" onclick="procesarVentaCompleta()" class="w-full bg-green-500 text-white font-bold text-xl py-4 rounded-xl shadow-lg mt-4 hover:bg-green-600 transition">✅ Cobrar</button>
+</div>
                     </div>
                 </div>
             </div>
@@ -356,6 +369,6 @@
         </div>
     </div>
 
-    <script type="module" src="/src/main.js?v=1.10"></script>
+    <script type="module" src="/src/main.js?v=1.11"></script>
 </body>
 </html>
