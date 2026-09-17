@@ -421,7 +421,8 @@ window.procesarVentaCompleta = async () => {
 
         window.carrito = []; window.renderCarrito(); window.renderInventarioPantalla(); 
         if(!document.getElementById('tab-agotados').classList.contains('hidden')) window.renderAgotados();
-        
+        document.getElementById('cobro_efectivo').value = ''; 
+        window.calcularCambio();
         btn.disabled = false; btn.innerText = "✅ Cobrar"; 
     } catch(er) { 
         console.error(er); window.mostrarNotificacion("❌ Ocurrió un error."); 
@@ -547,5 +548,34 @@ window.guardarRegistroRapido = async () => {
         window.mostrarNotificacion('❌ Error.'); 
     } finally { 
         btn.innerHTML = btnOriginalText; btn.disabled = false; 
+    }
+};
+window.calcularCambio = () => {
+    const lblTotal = document.getElementById('gran-total');
+    if(!lblTotal) return;
+    const totalVenta = parseFloat(lblTotal.innerText.replace('$', '').replace(/,/g, '')) || 0;
+    const inputEfectivo = document.getElementById('cobro_efectivo');
+    const efectivoIngresado = parseFloat(inputEfectivo.value) || 0;
+    
+    const lblCambio = document.getElementById('cobro_cambio');
+    const btnCobrar = document.getElementById('btn-cobrar'); 
+    
+    if (efectivoIngresado >= totalVenta && totalVenta > 0) {
+        const cambio = efectivoIngresado - totalVenta;
+        lblCambio.innerText = `$${cambio.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+        lblCambio.classList.remove('text-red-500');
+        lblCambio.classList.add('text-blue-600');
+        btnCobrar.disabled = false;
+        btnCobrar.classList.remove('opacity-50', 'cursor-not-allowed');
+    } else if (totalVenta > 0 && inputEfectivo.value !== "") {
+        lblCambio.innerText = "Falta dinero";
+        lblCambio.classList.remove('text-blue-600');
+        lblCambio.classList.add('text-red-500');
+        btnCobrar.disabled = true;
+        btnCobrar.classList.add('opacity-50', 'cursor-not-allowed');
+    } else {
+        lblCambio.innerText = "$0.00";
+        lblCambio.classList.remove('text-red-500');
+        lblCambio.classList.add('text-blue-600');
     }
 };
