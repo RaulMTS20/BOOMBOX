@@ -489,8 +489,36 @@ window.procesarArchivoMasivo = function() { const i = document.getElementById('a
 window.vaciarInventario = async () => { const z = document.getElementById('zonaSelect').value; const p = prompt(`Precaución. Escribe VACIAR para borrar toda la zona ${z}:`); if(p !== 'VACIAR') return; try { const sn = await getDocs(collection(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`)); sn.forEach(async (d) => { await deleteDoc(doc(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`, d.id)); }); window.mostrarNotificacion("✅ Inventario borrado."); window.cargarInventarioGeneral(); } catch(e) {} };
 
 window.generarReporte = async () => {
-    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const fIniStr = document.getElementById('rep_inicio').value; const fFinStr = document.getElementById('rep_fin').value; const fCat = document.getElementById('rep_cat').value; if(!fIniStr || !fFinStr) return window.mostrarNotificacion("⚠️ Selecciona fechas."); const tInicio = new Date(fIniStr + "T00:00:00").getTime(); const tFin = new Date(fFinStr + "T23:59:59").getTime(); const tb = document.getElementById('tablaReportesBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Procesando...</td></tr>"; let totalDinero = 0; let cantVentas = 0; let cantTickets = 0; let h = ""; window.datosReporteCSV = [["Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; let valorStockInfo = 0; window.inventarioLocal.forEach(p => { if(p.stock > 0) { valorStockInfo += (parseFloat(p.costo) || 0) * p.stock; } }); const elStock = document.getElementById('rep_valor_stock'); if(elStock) elStock.innerText = `$${valorStockInfo.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
-    try { const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); let ventasPeriodo = []; vSn.forEach(d => { const v = d.data(); if(v.timestamp >= tInicio && v.timestamp <= tFin) { if(fCat === 'Todas' || v.categoria === fCat) { ventasPeriodo.push(v); totalDinero += (v.precioVenta * v.cantidad); cantVentas += v.cantidad; } } }); const ticketsUnicos = new Set(ventasPeriodo.map(v => v.timestamp)); cantTickets = ticketsUnicos.size; const tkPromedio = cantTickets > 0 ? (totalDinero / cantTickets) : 0; document.getElementById('rep_total_vendido').innerText = `$${totalDinero.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; document.getElementById('rep_piezas_vendidas').innerText = cantVentas.toLocaleString(); document.getElementById('rep_ticket_promedio').innerText = `$${tkPromedio.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; ventasPeriodo.sort((a,b) => b.timestamp - a.timestamp); ventasPeriodo.forEach(v => { const sub = v.precioVenta * v.cantidad; const cV = v.cantidad % 1 !== 0 ? v.cantidad.toFixed(3) : v.cantidad; h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${v.fechaRegistro}</td><td class="p-3 font-bold">${v.nombre}</td><td class="p-3 text-xs">${v.categoria||'Gen'}</td><td class="p-3 text-center">${cV}</td><td class="p-3 text-indigo-600">${v.usuario}</td><td class="p-3 text-right text-green-600 font-bold">$${sub.toFixed(2)}</td></tr>`; window.datosReporteCSV.push([v.fechaRegistro, v.usuario, v.sku, v.nombre, v.categoria, v.cantidad, sub.toFixed(2)]); }); tb.innerHTML = h || "<tr><td colspan='6' class='p-8 text-center'>Sin ventas en este rango</td></tr>"; } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error</td></tr>`; }
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const fIniStr = document.getElementById('rep_inicio').value; const fFinStr = document.getElementById('rep_fin').value; const fCat = document.getElementById('rep_cat').value; if(!fIniStr || !fFinStr) return window.mostrarNotificacion("⚠️ Selecciona fechas."); const tInicio = new Date(fIniStr + "T00:00:00").getTime(); const tFin = new Date(fFinStr + "T23:59:59").getTime(); const tb = document.getElementById('tablaReportesBody'); tb.innerHTML = "<tr><td colspan='7' class='p-8 text-center'>Procesando...</td></tr>"; let totalDinero = 0; let cantVentas = 0; let cantTickets = 0; let h = ""; window.datosReporteCSV = [["Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; let valorStockInfo = 0; window.inventarioLocal.forEach(p => { if(p.stock > 0) { valorStockInfo += (parseFloat(p.costo) || 0) * p.stock; } }); const elStock = document.getElementById('rep_valor_stock'); if(elStock) elStock.innerText = `$${valorStockInfo.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+    try { 
+        const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); 
+        const vSn = await getDocs(qVentas); let ventasPeriodo = []; 
+        vSn.forEach(d => { 
+            const v = d.data(); 
+            if(v.timestamp >= tInicio && v.timestamp <= tFin) { 
+                if(fCat === 'Todas' || v.categoria === fCat) { 
+                    ventasPeriodo.push({ ...v, id: d.id }); // Se captura el ID único del documento en Firebase
+                    totalDinero += (v.precioVenta * v.cantidad); cantVentas += v.cantidad; 
+                } 
+            } 
+        }); 
+        const ticketsUnicos = new Set(ventasPeriodo.map(v => v.timestamp)); cantTickets = ticketsUnicos.size; const tkPromedio = cantTickets > 0 ? (totalDinero / cantTickets) : 0; document.getElementById('rep_total_vendido').innerText = `$${totalDinero.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; document.getElementById('rep_piezas_vendidas').innerText = cantVentas.toLocaleString(); document.getElementById('rep_ticket_promedio').innerText = `$${tkPromedio.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; 
+        
+        ventasPeriodo.sort((a,b) => b.timestamp - a.timestamp); 
+        const rolActual = localStorage.getItem('userRol');
+        
+        ventasPeriodo.forEach(v => { 
+            const sub = v.precioVenta * v.cantidad; 
+            const cV = v.cantidad % 1 !== 0 ? v.cantidad.toFixed(3) : v.cantidad; 
+            
+            // Lógica de seguridad: Solo Dueños y Gerentes ven el botón
+            const btnAnular = (rolActual === 'Dueño' || rolActual === 'Gerente') ? `<button onclick="window.anularVenta('${v.id}', '${v.sku}', ${v.cantidad})" class="bg-red-100 text-red-600 px-3 py-1 rounded hover:bg-red-200 font-bold text-xs transition">Anular</button>` : '';
+            
+            h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${v.fechaRegistro}</td><td class="p-3 font-bold">${v.nombre}</td><td class="p-3 text-xs">${v.categoria||'Gen'}</td><td class="p-3 text-center">${cV}</td><td class="p-3 text-indigo-600">${v.usuario}</td><td class="p-3 text-right text-green-600 font-bold">$${sub.toFixed(2)}</td><td class="p-3 text-center">${btnAnular}</td></tr>`; 
+            window.datosReporteCSV.push([v.fechaRegistro, v.usuario, v.sku, v.nombre, v.categoria, v.cantidad, sub.toFixed(2)]); 
+        }); 
+        tb.innerHTML = h || "<tr><td colspan='7' class='p-8 text-center'>Sin ventas en este rango</td></tr>"; 
+    } catch (err) { tb.innerHTML = `<tr><td colspan='7' class='text-red-500 text-center p-8'>Error al procesar reportes</td></tr>`; }
 };
 window.descargarCSV = () => { if(window.datosReporteCSV.length <= 1) return window.mostrarNotificacion("⚠️ Genera un reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; window.datosReporteCSV.forEach(function(rowArray) { let row = rowArray.map(item => `"${item}"`).join(","); csvContent += row + "\r\n"; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Reporte.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
 window.cargarKardex = async (tipo = 'entradas') => { window.kardexActual = tipo; document.getElementById('btn-kardex-entradas').className = tipo === 'entradas' ? 'px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; document.getElementById('btn-kardex-salidas').className = tipo === 'salidas' ? 'px-4 py-2 font-bold text-red-600 border-b-4 border-red-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaKardexBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando...</td></tr>"; let movs = []; try { if (tipo === 'entradas') { const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); const iSn = await getDocs(qIngresos); iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); } else { const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); vSn.forEach(d => { movs.push({...d.data(), tipo: 'SALIDA'}); }); } movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); const movsRecientes = movs.slice(0, 100); let h = ""; movsRecientes.forEach(m => { let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; } if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; } const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad; h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`; }); tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>Sin movimientos.</td></tr>`; } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error</td></tr>`; } };
@@ -577,5 +605,40 @@ window.calcularCambio = () => {
         lblCambio.innerText = "$0.00";
         lblCambio.classList.remove('text-red-500');
         lblCambio.classList.add('text-blue-600');
+    }
+};
+window.anularVenta = async (docId, sku, cantidadDevuelta) => {
+    if(!confirm("⚠️ ¿Eliminar esta venta? Los productos regresarán al stock automáticamente.")) return;
+    
+    const z = document.getElementById('zonaSelect').value;
+    const e = localStorage.getItem('empresaId');
+    
+    try {
+        // 1. Destruir el registro de la venta en la nube
+        await deleteDoc(doc(db, `${e}_Historial_Ventas`, docId));
+        
+        // 2. Regresar los artículos al inventario en la nube
+        const invRef = doc(db, `${e}_Inventario_${z}`, sku);
+        const invSnap = await getDoc(invRef);
+        
+        if(invSnap.exists()) {
+            const stockActualizado = invSnap.data().stock + cantidadDevuelta;
+            await setDoc(invRef, { stock: stockActualizado }, { merge: true });
+            
+            // 3. Sincronizar tu disco duro ultrarrápido (Dexie.js)
+            const objLocal = await window.localDB.inventario.get(sku);
+            if(objLocal) {
+                objLocal.stock = stockActualizado;
+                await window.localDB.inventario.put(objLocal);
+            }
+        }
+        
+        window.mostrarNotificacion("✅ Venta anulada. Stock restaurado.");
+        window.generarReporte(); // Recalcula los totales en pantalla al instante
+        window.cargarInventarioGeneral(); // Actualiza el inventario en segundo plano
+        
+    } catch(err) {
+        console.error(err);
+        window.mostrarNotificacion("❌ Error al anular la venta.");
     }
 };
