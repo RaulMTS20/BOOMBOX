@@ -266,7 +266,15 @@ if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuar
             if (botonUsuarios) botonUsuarios.classList.remove('hidden');
         }
 
-        window.cargarInventarioGeneral(); window.cargarProveedores(); window.cambiarPestaña('tab-ventas'); 
+        // 🔄 SINCRONIZACIÓN AUTOMÁTICA AL INICIAR
+        if (navigator.onLine) {
+            window.sincronizarInventarioNube(); // Fuerza la descarga de Firebase a Dexie
+        } else {
+            window.cargarInventarioGeneral(); // Si no hay internet, carga directo de Dexie
+        }
+        window.cargarProveedores(); 
+        window.cambiarPestaña('tab-ventas');
+        
     } catch (err) { 
             console.error("💥 ERROR FATAL REVELADO:", err); 
             // window.cerrarSesion(); 
