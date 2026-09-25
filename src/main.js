@@ -392,9 +392,32 @@ window.agregarAlCarrito = (p) => {
     if (ex) { if(ex.cantidad < p.stock) { ex.cantidad++; ex.precioVentaReal = window.calcularPrecioExacto(ex, ex.cantidad); } else { return window.mostrarNotificacion("⚠️ Límite de stock."); } } else { let n = { ...p, cantidad: 1 }; n.precioVentaReal = window.calcularPrecioExacto(n, 1); window.carrito.push(n); }
     window.mostrarNotificacion(`✅ Agregado`); window.renderCarrito();
 };
+window.agregarAlCarrito = (p) => {
+    // 🚀 REPARACIÓN: Se eliminó el bloqueo inicial "if(p.stock <= 0)"
+    const ex = window.carrito.find(i => i.sku === p.sku);
+    if (ex) { 
+        // 🚀 REPARACIÓN: Se eliminó la barrera que limitaba sumar más piezas que el stock actual
+        ex.cantidad++; 
+        ex.precioVentaReal = window.calcularPrecioExacto(ex, ex.cantidad); 
+    } else { 
+        let n = { ...p, cantidad: 1 }; 
+        n.precioVentaReal = window.calcularPrecioExacto(n, 1); 
+        window.carrito.push(n); 
+    }
+    window.mostrarNotificacion(`✅ Agregado`); 
+    window.renderCarrito();
+};
+
 window.cambiarCantidadCarrito = (sku, val) => { 
     let cant = parseFloat(val); if (isNaN(cant)) return; const item = window.carrito.find(p => p.sku === sku); 
-    if(item) { if(!item.es_granel && cant % 1 !== 0) { cant = Math.floor(cant); } if(cant > item.stock) { cant = item.stock; } if(cant <= 0) cant = item.es_granel ? 0.01 : 1; item.cantidad = cant; item.precioVentaReal = window.calcularPrecioExacto(item, cant); window.renderCarrito(); } 
+    if(item) { 
+        if(!item.es_granel && cant % 1 !== 0) { cant = Math.floor(cant); } 
+        // 🚀 REPARACIÓN: Se eliminó la línea "if(cant > item.stock) cant = item.stock;"
+        if(cant <= 0) cant = item.es_granel ? 0.01 : 1; 
+        item.cantidad = cant; 
+        item.precioVentaReal = window.calcularPrecioExacto(item, cant); 
+        window.renderCarrito(); 
+    } 
 };
 window.quitarDelCarrito = (i) => { window.carrito.splice(i, 1); window.renderCarrito(); };
 window.renderCarrito = () => {
