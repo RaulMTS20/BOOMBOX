@@ -52,7 +52,7 @@ window.generarHTMLTicket = (carrito, total, empresa, zona, cajero, fecha) => {
             <h1 style="font-size: 16px; margin: 0; font-weight: 900; text-transform: uppercase;">${empresa}</h1>
             <div style="font-size: 10px; color: #444;">Suc: ${zona}</div>
             <div style="font-size: 10px; color: #444;">${fecha}</div>
-            <div style="font-size: 10px; color: #444;">Cajero: ${cajero}</div>
+            <div style="font-size: 10px; color: #444;">${cajero}</div>
         </div>
         <div style="border-top: 2px solid #000; margin: 5px 0;"></div>
         <div style="font-weight: bold; font-size: 10px; margin-bottom: 5px;">${carrito.length} artículos (Ctd: ${totalItems.toFixed(2).replace(/\.00$/, '')})</div>
@@ -454,7 +454,7 @@ window.procesarVentaCompleta = async () => {
     const nVend = localStorage.getItem('numVendedor');
     
     // El interruptor: si tiene teléfono, lo formatea. Si no, solo pone el nombre.
-    const textoCajero = nVend ? `${u} - Tel: ${nVend}` : u; 
+    const textoCajero = nVend ? `Vendedor: ${u} - Tel: ${nVend}` : `Cajero: ${u}`;
     
     const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0;
     try {
