@@ -219,8 +219,26 @@ window.registrarNegocio = async () => {
 };
 window.iniciarSesion = async () => { 
     const btn = document.getElementById('btnLogin'); const u = document.getElementById('loginUser').value.trim(); const p = document.getElementById('loginPass').value.trim(); if(!u || !p) return window.mostrarNotificacion("⚠️ Faltan datos."); btn.innerText = "Conectando..."; btn.disabled = true;
-    try { const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) { btn.innerText = "Entrar"; btn.disabled = false; return window.mostrarNotificacion("❌ Usuario no encontrado."); } const cred = await signInWithEmailAndPassword(auth, dirDoc.data().email, p); const uid = cred.user.uid; const userDoc = await getDoc(doc(db, "SaaS_Usuarios", uid)); 
-        if (userDoc.exists()) { const d = userDoc.data(); localStorage.setItem('currentUser', u); localStorage.setItem('empresaId', d.empresaId); localStorage.setItem('empresaNombre', d.empresaNombre || d.empresaId); localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); localStorage.setItem('userRol', d.rol || "Vendedor"); iniciarApp(); } 
+    try { 
+        const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); 
+        if(!dirDoc.exists()) { btn.innerText = "Entrar"; btn.disabled = false; return window.mostrarNotificacion("❌ Usuario no encontrado."); } 
+        const cred = await signInWithEmailAndPassword(auth, dirDoc.data().email, p); 
+        const uid = cred.user.uid; 
+        const userDoc = await getDoc(doc(db, "SaaS_Usuarios", uid)); 
+        
+        if (userDoc.exists()) { 
+            const d = userDoc.data(); 
+            localStorage.setItem('currentUser', u); 
+            localStorage.setItem('empresaId', d.empresaId); 
+            localStorage.setItem('empresaNombre', d.empresaNombre || d.empresaId); 
+            localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); 
+            localStorage.setItem('userRol', d.rol || "Vendedor"); 
+            
+            // 🚀 REPARACIÓN: Descargar el teléfono de contacto registrado
+            localStorage.setItem('numVendedor', d.numVendedor || ""); 
+            
+            iniciarApp(); 
+        } 
     } catch (er) { window.mostrarNotificacion("❌ Contraseña incorrecta."); } finally { btn.innerText = "Entrar"; btn.disabled = false; }
 };
 window.recuperarPassword = async () => { const u = prompt("Ingresa tu Usuario:"); if(!u) return; try { const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) return window.mostrarNotificacion("❌ No existe el usuario."); await sendPasswordResetEmail(auth, dirDoc.data().email); window.mostrarNotificacion(`✅ Enlace enviado al correo.`); } catch(e) { window.mostrarNotificacion("❌ Error."); } };
@@ -431,8 +449,14 @@ window.renderCarrito = () => {
 window.procesarVentaCompleta = async () => {
     if (window.carrito.length === 0) return window.mostrarNotificacion("⚠️ El carrito está vacío."); 
     const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando..."; 
-    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const eNombre = localStorage.getItem('empresaNombre') || e; const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0; 
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const eNombre = localStorage.getItem('empresaNombre') || e; 
+    const u = localStorage.getItem('currentUser'); 
+    const nVend = localStorage.getItem('numVendedor');
     
+    // El interruptor: si tiene teléfono, lo formatea. Si no, solo pone el nombre.
+    const textoCajero = nVend ? `${u} - Tel: ${nVend}` : u; 
+    
+    const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0;
     try {
         for (const i of window.carrito) { 
             const sub = i.precioVentaReal * i.cantidad; tot += sub; 
@@ -447,7 +471,7 @@ window.procesarVentaCompleta = async () => {
             if(itemLocal) itemLocal.stock = nuevoStock;
         }
         
-        window.generarHTMLTicket(window.carrito, tot, eNombre, z, u, f);
+        window.generarHTMLTicket(window.carrito, tot, eNombre, z, textoCajero, f);
         document.getElementById('modal-ticket').classList.remove('hidden');
 
         window.carrito = []; window.renderCarrito(); window.renderInventarioPantalla(); 
