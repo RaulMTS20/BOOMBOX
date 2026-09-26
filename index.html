@@ -14,9 +14,14 @@
         .animate-fade-in { animation: fadeIn 0.2s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         .toast { position: fixed; bottom: 20px; right: 20px; color: white; padding: 12px 24px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; font-weight: bold; background: #1f2937; border-left: 4px solid #f97316; }
+        
+        /* 🚀 REPARACIÓN: Escalador Global (Aumenta toda la interfaz un 15%) */
+        html { font-size: 115%; }
+
         @media screen and (max-width: 768px) {
-            table { font-size: 11px !important; }
-            th, td { padding: 6px 4px !important; white-space: normal !important; word-wrap: break-word; }
+            /* 🚀 REPARACIÓN: Eliminar restricción de 11px y aumentar legibilidad de tablas */
+            table { font-size: 14px !important; }
+            th, td { padding: 8px 6px !important; white-space: normal !important; word-wrap: break-word; }
         }
     </style>
 </head>
@@ -382,6 +387,6 @@
         </div>
     </div>
 
-    <script type="module" src="/src/main.js?v=1.14"></script>
+    <script type="module" src="/src/main.js?v=1.15"></script>
 </body>
 </html>
