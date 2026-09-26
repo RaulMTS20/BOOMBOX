@@ -1,6 +1,6 @@
 // 1. Importar las herramientas de Firebase
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore"; 
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 // 2. Tu configuración única de BOOMBOX
 const firebaseConfig = {
@@ -15,4 +15,7 @@ const firebaseConfig = {
 
 // 3. Inicializar la conexión
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// 🚀 REPARACIÓN: Inicialización de base de datos con persistencia offline forzada
+export const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
