@@ -86,34 +86,62 @@ window.generarHTMLTicket = (carrito, total, empresa, zona, cajero, fecha) => {
 };
 
 // 📤 COMPARTIR COMO IMAGEN (CON RECOLECTOR DE BASURA PARA LIBERAR RAM)
-window.compartirTicket = async () => {
-    const elementoTicket = document.getElementById('ticket-visual');
-    const btn = document.querySelector('button[onclick="compartirTicket()"]');
-    const textoOriginal = btn.innerHTML;
-    try {
-        btn.innerHTML = '⏳ Generando recibo...'; btn.disabled = true;
-        const canvas = await html2canvas(elementoTicket, { scale: 2, backgroundColor: "#ffffff" });
-        canvas.toBlob(async (blob) => {
-            const file = new File([blob], "recibo_yotobox.png", { type: "image/png" });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-                await navigator.share({ title: 'Recibo de Compra', text: 'Gracias por tu compra.', files: [file] });
-            } else { 
-                window.mostrarNotificacion("Tu navegador no soporta envío directo."); 
-            }
-            btn.innerHTML = textoOriginal; btn.disabled = false;
-            
-            // GARBAGE COLLECTOR: Forzamos la limpieza de la memoria RAM eliminando el lienzo usado
-            canvas.width = 0; 
-            canvas.height = 0;
-        }, 'image/png');
-    } catch (err) { 
-        console.error(err); window.mostrarNotificacion("Error al generar imagen."); 
-        btn.innerHTML = textoOriginal; btn.disabled = false; 
-    }
+window.cerrarModalTicket = () => {
+    document.getElementById('modal-ticket').classList.add('hidden');
+    
+    // 🚀 REPARACIÓN 1: Vaciar el contenedor HTML para liberar el procesador
+    const visual = document.getElementById('ticket-visual');
+    if(visual) visual.innerHTML = ''; 
 };
 
-window.cerrarModalTicket = () => { document.getElementById('modal-ticket').classList.add('hidden'); document.getElementById('venta_busqueda').focus(); };
-
+window.compartirTicket = async () => {
+    const btn = event.currentTarget;
+    const textoOriginal = btn.innerHTML;
+    btn.innerHTML = "⏳ Procesando imagen..."; 
+    btn.disabled = true;
+    
+    try {
+        const elemento = document.getElementById('ticket-visual');
+        
+        // 🚀 REPARACIÓN 2: Configuraciones para evitar el desbordamiento de memoria
+        const canvas = await html2canvas(elemento, { 
+            scale: 2, 
+            logging: false, // Apaga el registro en consola que consume mucha RAM
+            removeContainer: true // Destruye el clon invisible inmediatamente
+        });
+        
+        canvas.toBlob(async (blob) => {
+            try {
+                const f = new File([blob], "ticket.png", { type: "image/png" });
+                if (navigator.canShare && navigator.canShare({ files: [f] })) {
+                    await navigator.share({ files: [f], title: 'Ticket de Venta', text: 'Gracias por su compra' });
+                } else {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url; a.download = 'ticket.png';
+                    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                    URL.revokeObjectURL(url); // Libera la memoria del objeto blob
+                }
+            } catch(e) { 
+                console.error("Error al compartir", e); 
+            }
+            
+            // 🚀 REPARACIÓN 3: DESTRUCCIÓN TOTAL DEL LIENZO FANTASMA
+            // Forzamos al recolector de basura (Garbage Collector) a eliminar el rastro
+            canvas.width = 0; 
+            canvas.height = 0; 
+            if (canvas.parentNode) canvas.parentNode.removeChild(canvas);
+            
+        }, 'image/png');
+        
+    } catch (err) {
+        console.error("Error crítico en html2canvas", err);
+        window.mostrarNotificacion("❌ Error al generar imagen");
+    } finally {
+        btn.innerHTML = textoOriginal; 
+        btn.disabled = false;
+    }
+};
 // 🌐 CATÁLOGO GLOBAL
 window.actualizarCatalogoGlobal = async (sku, nombre, costo) => {
     if(!sku || !nombre || String(sku).trim().length < 8) return; 
@@ -233,14 +261,21 @@ window.iniciarSesion = async () => {
             localStorage.setItem('empresaNombre', d.empresaNombre || d.empresaId); 
             localStorage.setItem('zonas', JSON.stringify(d.zonas || [])); 
             localStorage.setItem('userRol', d.rol || "Vendedor"); 
-            
-            // 🚀 REPARACIÓN: Descargar el teléfono de contacto registrado
             localStorage.setItem('numVendedor', d.numVendedor || ""); 
+            
+            // 🚀 DESCARGAR Y GUARDAR EL GIRO DE LA EMPRESA
+            let giroNegocio = "Otro";
+            try {
+                const empDoc = await getDoc(doc(db, "SaaS_Empresas", d.empresaId));
+                if(empDoc.exists()) giroNegocio = empDoc.data().giro || "Otro";
+            } catch(e) { console.error("No se pudo leer el giro"); }
+            localStorage.setItem('empresaGiro', giroNegocio);
             
             iniciarApp(); 
         } 
     } catch (er) { window.mostrarNotificacion("❌ Contraseña incorrecta."); } finally { btn.innerText = "Entrar"; btn.disabled = false; }
 };
+
 window.recuperarPassword = async () => { const u = prompt("Ingresa tu Usuario:"); if(!u) return; try { const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) return window.mostrarNotificacion("❌ No existe el usuario."); await sendPasswordResetEmail(auth, dirDoc.data().email); window.mostrarNotificacion(`✅ Enlace enviado al correo.`); } catch(e) { window.mostrarNotificacion("❌ Error."); } };
 window.cerrarSesion = () => { localStorage.clear(); location.reload(); };
 
@@ -282,6 +317,17 @@ if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuar
         if (rolActual === 'Dueño') {
             const botonUsuarios = document.getElementById('btn-tab-usuarios');
             if (botonUsuarios) botonUsuarios.classList.remove('hidden');
+        }
+// 🚀 LÓGICA DE VISIBILIDAD DE REPORTES
+        const giroEmpresa = localStorage.getItem('empresaGiro') || 'Otro';
+        const btnReportes = document.getElementById('btn-tab-reportes');
+
+        if (btnReportes) {
+            if (rolActual === 'Dueño' || rolActual === 'Gerente' || (giroEmpresa === 'Cambaceo' && rolActual === 'Vendedor')) {
+                btnReportes.classList.remove('hidden');
+            } else {
+                btnReportes.classList.add('hidden');
+            }
         }
 
         // 🔄 SINCRONIZACIÓN AUTOMÁTICA AL INICIAR
@@ -542,23 +588,73 @@ window.guardarEdicionProducto = async () => {
 };
 window.procesarArchivoMasivo = function() { const i = document.getElementById('archivoInventario'); const s = document.getElementById('statusCargaMasiva'); const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); if (!i.files || i.files.length === 0) return; const a = i.files[0]; const l = new FileReader(); s.classList.remove('hidden'); s.className = "mt-4 p-4 bg-blue-50 text-blue-700 rounded-lg font-bold"; s.innerText = "⏳ Sincronizando..."; l.onload = async function(ev) { const c = ev.target.result; let pr = 0; const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); try { let batch = writeBatch(db); let opCount = 0; const commitBatch = async () => { if(opCount > 0) { await batch.commit(); batch = writeBatch(db); opCount = 0; } }; const procesarItem = async (sku, nom, stk, cos, pre) => { batch.set(doc(db, `${e}_Inventario_${z}`, sku), { sku, nombre: nom, costo: cos, precio: pre, stock: stk, zona: z, categoria: "General", proveedor: "", min_stk: 0, max_stk: 0, precio_promo: 0, precio_mayoreo: 0, cant_mayoreo: 0, es_granel: false, caducidad: null }, {merge:true}); opCount++; if(stk > 0) { batch.set(doc(collection(db, `${e}_Historial_Ingresos`)), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); opCount++; } if(opCount > 400) await commitBatch(); }; if (a.name.endsWith('.xml')) { const xm = new DOMParser().parseFromString(c, "text/xml"); const it = xm.getElementsByTagName("item"); for (let j = 0; j < it.length; j++) { const item = it[j]; const sku = item.getElementsByTagName("value0")[0]?.textContent?.trim() || ""; if (!sku) continue; const nom = item.getElementsByTagName("value1")[0]?.textContent?.trim() || ""; const stk = parseFloat(item.getElementsByTagName("value2")[0]?.textContent?.trim() || "0"); const nC = item.getElementsByTagName("value3")[0]?.textContent?.trim() || ""; let cos = 0; let pre = 0; if(nC) { const p = nC.split('?'); const eN = (str) => { const m = str.match(/\d+(\.\d+)?/); return m ? parseFloat(m[0]) : 0; }; cos = eN(p[0]); pre = p.length > 1 ? eN(p[1]) : cos; if (pre === 0) pre = cos; } await procesarItem(sku, nom, stk, cos, pre); pr++; } } else if (a.name.endsWith('.txt')) { const ln = c.split('\n'); for (let li of ln) { const col = li.trim().split(','); if (col.length >= 5 && col[0].trim()) { await procesarItem(col[0].trim(), col[1].trim(), parseFloat(col[4])||0, parseFloat(col[2])||0, parseFloat(col[3])||0); pr++; } } } await commitBatch(); s.className = "mt-4 p-4 bg-green-50 text-green-700 rounded-lg font-bold"; s.innerText = `✅ Carga Exitosa! ${pr} productos cargados.`; window.cargarInventarioGeneral(); } catch (er) { s.className = "mt-4 p-4 bg-red-50 text-red-700 rounded-lg"; s.innerText = "❌ Error en archivo."; } }; l.readAsText(a); };
 window.vaciarInventario = async () => { const z = document.getElementById('zonaSelect').value; const p = prompt(`Precaución. Escribe VACIAR para borrar toda la zona ${z}:`); if(p !== 'VACIAR') return; try { const sn = await getDocs(collection(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`)); sn.forEach(async (d) => { await deleteDoc(doc(db, `${localStorage.getItem('empresaId')}_Inventario_${z}`, d.id)); }); window.mostrarNotificacion("✅ Inventario borrado."); window.cargarInventarioGeneral(); } catch(e) {} };
-
 window.generarReporte = async () => {
-    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const fIniStr = document.getElementById('rep_inicio').value; const fFinStr = document.getElementById('rep_fin').value; const fCat = document.getElementById('rep_cat').value; if(!fIniStr || !fFinStr) return window.mostrarNotificacion("⚠️ Selecciona fechas."); const tInicio = new Date(fIniStr + "T00:00:00").getTime(); const tFin = new Date(fFinStr + "T23:59:59").getTime(); const tb = document.getElementById('tablaReportesBody'); tb.innerHTML = "<tr><td colspan='7' class='p-8 text-center'>Procesando...</td></tr>"; let totalDinero = 0; let cantVentas = 0; let cantTickets = 0; let h = ""; window.datosReporteCSV = [["Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; let valorStockInfo = 0; window.inventarioLocal.forEach(p => { if(p.stock > 0) { valorStockInfo += (parseFloat(p.costo) || 0) * p.stock; } }); const elStock = document.getElementById('rep_valor_stock'); if(elStock) elStock.innerText = `$${valorStockInfo.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+    let fIniStr = document.getElementById('rep_inicio').value; 
+    let fFinStr = document.getElementById('rep_fin').value; 
+    
+    // 1. FECHA AUTOMÁTICA POR DEFECTO
+    if(!fIniStr || !fFinStr) {
+        const f = new Date(); 
+        const hoy = f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0');
+        document.getElementById('rep_inicio').value = hoy;
+        document.getElementById('rep_fin').value = hoy;
+        fIniStr = hoy;
+        fFinStr = hoy;
+    }
+
+    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const fCat = document.getElementById('rep_cat').value; 
+    const tInicio = new Date(fIniStr + "T00:00:00").getTime(); const tFin = new Date(fFinStr + "T23:59:59").getTime(); 
+    
+    const tbDetalle = document.getElementById('tablaReportesBody'); 
+    const tbConsolidado = document.getElementById('tablaReportesConsolidado');
+    if(tbDetalle) tbDetalle.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Procesando historial...</td></tr>";
+    if(tbConsolidado) tbConsolidado.innerHTML = "<tr><td colspan='4' class='p-8 text-center'>Calculando resumen...</td></tr>";
+
+    let totalDinero = 0; let cantVentas = 0; let cantTickets = 0; 
+    let hDetalle = ""; let hConsolidado = "";
+    window.datosReporteCSV = [["Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; 
+    
+    let valorStockInfo = 0; 
+    window.inventarioLocal.forEach(p => { if(p.stock > 0) { valorStockInfo += (parseFloat(p.costo) || 0) * p.stock; } }); 
+    const elStock = document.getElementById('rep_valor_stock'); if(elStock) elStock.innerText = `$${valorStockInfo.toLocaleString('es-MX', {minimumFractionDigits: 2})}`;
+    
     try { 
         const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); 
-        const vSn = await getDocs(qVentas); let ventasPeriodo = []; 
+        const vSn = await getDocs(qVentas); 
+        let ventasPeriodo = []; 
+        let consolidados = {}; 
+
         vSn.forEach(d => { 
             const v = d.data(); 
             if(v.timestamp >= tInicio && v.timestamp <= tFin) { 
                 if(fCat === 'Todas' || v.categoria === fCat) { 
-                    ventasPeriodo.push({ ...v, id: d.id }); // Se captura el ID único del documento en Firebase
-                    totalDinero += (v.precioVenta * v.cantidad); cantVentas += v.cantidad; 
+                    ventasPeriodo.push({ ...v, id: d.id }); 
+                    totalDinero += (v.precioVenta * v.cantidad); 
+                    cantVentas += v.cantidad; 
+                    
+                    // 2. CONSOLIDAR PRODUCTOS
+                    if(!consolidados[v.sku]) {
+                        consolidados[v.sku] = { sku: v.sku, nombre: v.nombre, cantidadTotal: 0, ingresoTotal: 0 };
+                    }
+                    consolidados[v.sku].cantidadTotal += parseFloat(v.cantidad);
+                    consolidados[v.sku].ingresoTotal += (parseFloat(v.precioVenta) * parseFloat(v.cantidad));
                 } 
             } 
         }); 
-        const ticketsUnicos = new Set(ventasPeriodo.map(v => v.timestamp)); cantTickets = ticketsUnicos.size; const tkPromedio = cantTickets > 0 ? (totalDinero / cantTickets) : 0; document.getElementById('rep_total_vendido').innerText = `$${totalDinero.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; document.getElementById('rep_piezas_vendidas').innerText = cantVentas.toLocaleString(); document.getElementById('rep_ticket_promedio').innerText = `$${tkPromedio.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; 
+
+        const ticketsUnicos = new Set(ventasPeriodo.map(v => v.timestamp)); cantTickets = ticketsUnicos.size; const tkPromedio = cantTickets > 0 ? (totalDinero / cantTickets) : 0; 
+        document.getElementById('rep_total_vendido').innerText = `$${totalDinero.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; 
+        document.getElementById('rep_piezas_vendidas').innerText = cantVentas.toLocaleString(); 
+        document.getElementById('rep_ticket_promedio').innerText = `$${tkPromedio.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; 
         
+        // 3. PINTAR TABLA CONSOLIDADA
+        Object.values(consolidados).sort((a,b) => b.cantidadTotal - a.cantidadTotal).forEach(c => {
+            const cantF = c.cantidadTotal % 1 !== 0 ? c.cantidadTotal.toFixed(3) : c.cantidadTotal;
+            hConsolidado += `<tr class="border-b hover:bg-gray-50"><td class="p-3 text-xs text-gray-500 font-mono">${c.sku}</td><td class="p-3 font-bold text-indigo-700">${c.nombre}</td><td class="p-3 text-center font-black">${cantF}</td><td class="p-3 text-right text-green-600 font-bold">$${c.ingresoTotal.toFixed(2)}</td></tr>`;
+        });
+        if (tbConsolidado) tbConsolidado.innerHTML = hConsolidado || "<tr><td colspan='4' class='p-8 text-center text-gray-500'>Sin productos vendidos</td></tr>";
+
+        // 4. PINTAR TABLA DETALLADA (HISTORIAL)
         ventasPeriodo.sort((a,b) => b.timestamp - a.timestamp); 
         const rolActual = localStorage.getItem('userRol');
         
@@ -566,14 +662,18 @@ window.generarReporte = async () => {
             const sub = v.precioVenta * v.cantidad; 
             const cV = v.cantidad % 1 !== 0 ? v.cantidad.toFixed(3) : v.cantidad; 
             
-            // Lógica de seguridad: Solo Dueños y Gerentes ven el botón
+            // Botón de anular protegido (solo Dueños y Gerentes)
             const btnAnular = (rolActual === 'Dueño' || rolActual === 'Gerente') ? `<button onclick="window.anularVenta('${v.id}', '${v.sku}', ${v.cantidad})" class="bg-red-100 text-red-600 px-3 py-1 rounded hover:bg-red-200 font-bold text-xs transition">Anular</button>` : '';
             
-            h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${v.fechaRegistro}</td><td class="p-3 font-bold">${v.nombre}</td><td class="p-3 text-xs">${v.categoria||'Gen'}</td><td class="p-3 text-center">${cV}</td><td class="p-3 text-indigo-600">${v.usuario}</td><td class="p-3 text-right text-green-600 font-bold">$${sub.toFixed(2)}</td><td class="p-3 text-center">${btnAnular}</td></tr>`; 
+            hDetalle += `<tr class="border-b hover:bg-gray-50"><td class="p-3 text-[10px] text-gray-500">${v.fechaRegistro}</td><td class="p-3 font-bold">${v.nombre}</td><td class="p-3 text-center">${cV}</td><td class="p-3 text-indigo-600 text-xs">${v.usuario}</td><td class="p-3 text-right text-green-600 font-bold">$${sub.toFixed(2)}</td><td class="p-3 text-center">${btnAnular}</td></tr>`; 
             window.datosReporteCSV.push([v.fechaRegistro, v.usuario, v.sku, v.nombre, v.categoria, v.cantidad, sub.toFixed(2)]); 
         }); 
-        tb.innerHTML = h || "<tr><td colspan='7' class='p-8 text-center'>Sin ventas en este rango</td></tr>"; 
-    } catch (err) { tb.innerHTML = `<tr><td colspan='7' class='text-red-500 text-center p-8'>Error al procesar reportes</td></tr>`; }
+        if(tbDetalle) tbDetalle.innerHTML = hDetalle || "<tr><td colspan='6' class='p-8 text-center text-gray-500'>Sin ventas en este rango</td></tr>"; 
+        
+    } catch (err) { 
+        console.error(err);
+        if(tbDetalle) tbDetalle.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error al procesar reportes</td></tr>`; 
+    }
 };
 window.descargarCSV = () => { if(window.datosReporteCSV.length <= 1) return window.mostrarNotificacion("⚠️ Genera un reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; window.datosReporteCSV.forEach(function(rowArray) { let row = rowArray.map(item => `"${item}"`).join(","); csvContent += row + "\r\n"; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Reporte.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
 window.cargarKardex = async (tipo = 'entradas') => { window.kardexActual = tipo; document.getElementById('btn-kardex-entradas').className = tipo === 'entradas' ? 'px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; document.getElementById('btn-kardex-salidas').className = tipo === 'salidas' ? 'px-4 py-2 font-bold text-red-600 border-b-4 border-red-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaKardexBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando...</td></tr>"; let movs = []; try { if (tipo === 'entradas') { const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); const iSn = await getDocs(qIngresos); iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); } else { const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); vSn.forEach(d => { movs.push({...d.data(), tipo: 'SALIDA'}); }); } movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); const movsRecientes = movs.slice(0, 100); let h = ""; movsRecientes.forEach(m => { let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; } if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; } const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad; h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`; }); tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>Sin movimientos.</td></tr>`; } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error</td></tr>`; } };
