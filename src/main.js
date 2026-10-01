@@ -45,6 +45,7 @@ window.mostrarNotificacion = (mensaje) => {
 
 // 🖨️ NUEVO CREADOR DE TICKET VISUAL PARA COMPARTIR
 window.generarHTMLTicket = (carrito, total, empresa, zona, cajero, fecha) => {
+    const giroEmpresa = localStorage.getItem('empresaGiro') || 'Otro'; // 🚀 NUEVO: Detectar giro
     let totalItems = 0; carrito.forEach(i => totalItems += parseFloat(i.cantidad));
     
     let html = `
@@ -63,11 +64,17 @@ window.generarHTMLTicket = (carrito, total, empresa, zona, cajero, fecha) => {
         const sub = i.precioVentaReal * i.cantidad;
         const cV = i.cantidad % 1 !== 0 ? parseFloat(i.cantidad).toFixed(3) : i.cantidad;
         const pUnit = (i.cantidad > 1 || i.es_granel) ? `<br><span style="color:#666; font-size:8px;">$${i.precioVentaReal.toLocaleString('es-MX', {minimumFractionDigits: 2})}</span>` : '';
+        
+        // 🚀 NUEVO: Mostrar el precio sugerido unitario en el ticket si es cambaceo
+        let pSugHtml = '';
+        if (giroEmpresa === 'Cambaceo' && i.precio_sugerido > 0) {
+            pSugHtml = `<br><span style="color:#8b5cf6; font-size:8px; font-weight:bold;">Sugerido: $${i.precio_sugerido.toLocaleString('es-MX', {minimumFractionDigits: 2})}</span>`;
+        }
 
         html += `<tr>
             <td style="width: 15%; vertical-align: top; padding: 3px 0;">${cV}x</td>
             <td style="width: 60%; vertical-align: top; padding: 3px 0;">
-                <span style="font-weight: bold;">${i.nombre.substring(0,22)}</span>${pUnit}
+                <span style="font-weight: bold;">${i.nombre.substring(0,22)}</span>${pUnit}${pSugHtml}
             </td>
             <td style="width: 25%; text-align: right; vertical-align: top; padding: 3px 0; font-weight:bold;">$${sub.toLocaleString('es-MX', {minimumFractionDigits: 2})}</td>
         </tr>`;
@@ -417,16 +424,26 @@ window.cargarInventarioGeneral = async () => {
 };
 
 window.renderInventarioPantalla = () => {
-    const r = localStorage.getItem('userRol'); const tb = document.getElementById('tablaInventarioGeneralBody'); const txt = document.getElementById('filtro_inv_txt').value.toLowerCase(); const cat = document.getElementById('filtro_inv_cat').value; const ord = document.getElementById('filtro_inv_ord').value;
+    const r = localStorage.getItem('userRol'); 
+    const giroEmpresa = localStorage.getItem('empresaGiro') || 'Otro'; // 🚀 NUEVO: Detectar giro
+    const tb = document.getElementById('tablaInventarioGeneralBody'); const txt = document.getElementById('filtro_inv_txt').value.toLowerCase(); const cat = document.getElementById('filtro_inv_cat').value; const ord = document.getElementById('filtro_inv_ord').value;
     let lista = window.inventarioLocal.filter(p => { const coincideTxt = p.nombre.toLowerCase().includes(txt) || p.sku.toLowerCase().includes(txt); const coincideCat = (cat === "Todas" || p.categoria === cat); return coincideTxt && coincideCat; });
     if(ord === 'nombre') lista.sort((a,b) => a.nombre.localeCompare(b.nombre)); if(ord === 'stock_asc') lista.sort((a,b) => a.stock - b.stock); if(ord === 'stock_desc') lista.sort((a,b) => b.stock - a.stock); let h = "";
     lista.forEach(p => {
         const isManager = (r === 'Dueño' || r === 'Gerente'); const cc = isManager ? `<td class="p-3 text-left costo-col">$${p.costo || 0}</td>` : `<td class="p-3 text-left costo-col hidden"></td>`; const ca = isManager ? `<td class="p-3 text-center accion-col md:min-w-[200px]"><button onclick="abrirModalEdicion('${p.sku}')" class="text-blue-600 bg-blue-50 px-3 py-2 rounded font-bold hover:bg-blue-100 transition mb-1 md:mb-0 md:mr-2 text-lg">✏️</button><button onclick="eliminarProducto('${p.sku}')" class="text-red-600 bg-red-50 px-3 py-2 rounded font-bold hover:bg-red-100 transition text-lg">🗑️</button></td>` : `<td class="p-3 text-left accion-col hidden"></td>`;
         const stockVal = p.stock % 1 !== 0 ? p.stock.toFixed(3) : p.stock; let badges = `<span class="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded block mb-1 w-fit">${p.categoria || 'General'}</span>`; if(p.es_granel) badges += `<span class="bg-purple-100 text-purple-700 text-xs px-2 py-1 rounded block w-fit font-bold mb-1">Granel</span>`; if(p.proveedor) badges += `<span class="bg-teal-50 text-teal-700 text-[10px] font-bold px-2 py-1 rounded block w-fit mb-1 border border-teal-200">🚚 ${p.proveedor}</span>`; if(p.caducidad) { const diff = Math.floor((new Date(p.caducidad) - Date.now()) / 86400000); if(diff <= 30) badges += `<span class="bg-red-100 text-red-700 text-[10px] px-2 py-1 rounded block w-fit font-bold">Vence en ${diff}d</span>`; }
+        
         let precioStr = `<span class="text-green-600 font-bold block">$${p.precio}</span>`; if (p.precio_promo && p.precio_promo > 0) precioStr = `<span class="text-xs text-red-500 line-through block">$${p.precio}</span><span class="text-green-600 font-bold block">$${p.precio_promo} <span class="text-[10px] text-red-500 font-normal">(Promo)</span></span>`; if (p.cant_mayoreo > 0 && p.precio_mayoreo > 0) precioStr += `<span class="text-xs text-blue-600 font-bold block mt-1">$${p.precio_mayoreo} <span class="text-gray-500 font-normal">(x${p.cant_mayoreo}+)</span></span>`;
+        
+        // 🚀 NUEVO: Inyectar etiqueta de precio sugerido solo a vendedores de cambaceo
+        if (giroEmpresa === 'Cambaceo' && p.precio_sugerido > 0) {
+            precioStr += `<span class="text-[10px] text-purple-700 font-bold block mt-1 bg-purple-100 px-1.5 py-0.5 rounded w-fit">Sugerido: $${p.precio_sugerido}</span>`;
+        }
+
         h += `<tr class="border-b hover:bg-gray-50"><td class="p-3 font-mono text-gray-500 text-xs hidden">${p.sku}</td><td class="p-3 font-bold">${p.nombre}</td><td class="p-3">${badges}</td><td class="p-3 text-center font-black ${p.stock<=(p.min_stk||0)?'text-red-500':''}">${stockVal}</td>${cc}<td class="p-3 text-left">${precioStr}</td>${ca}</tr>`; 
     }); tb.innerHTML = h || "<tr><td colspan='7' class='text-center p-8 text-gray-500'>No hay productos que coincidan con el filtro</td></tr>";
 };
+
 window.eliminarProducto = async (sku) => {
     if(!confirm(`⚠️ ¿ELIMINAR ${sku}?`)) return; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser');
     try { 
@@ -548,26 +565,33 @@ window.cargarProveedores = async () => { const e = localStorage.getItem('empresa
 window.eliminarProveedor = async (id) => { if(!confirm("¿Borrar este proveedor?")) return; const e = localStorage.getItem('empresaId'); try { await deleteDoc(doc(db, `${e}_Proveedores`, id)); window.cargarProveedores(); } catch(er) {} };
 
 window.guardarProducto = async () => {
-    const sku = document.getElementById('p_sku').value.trim(); const nom = document.getElementById('p_nom').value.trim(); const cat = document.getElementById('p_cat').value.trim() || "General"; const prov = document.getElementById('p_prov')?.value || ""; const cos = parseFloat(document.getElementById('p_cos').value) || 0; const pre = parseFloat(document.getElementById('p_pre').value) || 0; const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('p_stk').value) || 0; const minS = parseFloat(document.getElementById('p_min').value) || 0; const maxS = parseFloat(document.getElementById('p_max').value) || 0; const isGranel = document.getElementById('p_granel').checked; const cad = document.getElementById('p_caducidad').value || null; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); if(!sku || !nom) return window.mostrarNotificacion("⚠️ SKU y Nombre obligatorios.");
+    const sku = document.getElementById('p_sku').value.trim(); const nom = document.getElementById('p_nom').value.trim(); const cat = document.getElementById('p_cat').value.trim() || "General"; const prov = document.getElementById('p_prov')?.value || ""; const cos = parseFloat(document.getElementById('p_cos').value) || 0; const pre = parseFloat(document.getElementById('p_pre').value) || 0; const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('p_stk').value) || 0; const minS = parseFloat(document.getElementById('p_min').value) || 0; const maxS = parseFloat(document.getElementById('p_max').value) || 0; 
+    // 🚀 NUEVO: Capturar el precio sugerido
+    const pSug = parseFloat(document.getElementById('p_sugerido')?.value) || 0; 
+    const isGranel = document.getElementById('p_granel').checked; const cad = document.getElementById('p_caducidad').value || null; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); if(!sku || !nom) return window.mostrarNotificacion("⚠️ SKU y Nombre obligatorios.");
     try { 
         const r = `${e}_Inventario_${z}`; 
         const d = await getDoc(doc(db, r, sku)); 
         let sF = stk; if (d.exists()) sF += d.data().stock; 
-        const nuevoProducto = { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0 };
+        
+        // 🚀 NUEVO: Inyectar precio_sugerido a la base de datos sin alterar el costo real
+        const nuevoProducto = { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0, precio_sugerido: pSug };
         
         await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); 
         await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); 
         await window.actualizarCatalogoGlobal(sku, nom, cos); 
         
-        // 🚀 REPARACIÓN: Actualizar la memoria local (Dexie.js)
         await window.localDB.inventario.put(nuevoProducto);
         
         window.mostrarNotificacion("📦 Producto ingresado correctamente"); 
         ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); 
-        if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; document.getElementById('p_granel').checked = false; 
+        if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; 
+        if(document.getElementById('p_sugerido')) document.getElementById('p_sugerido').value = ''; // Limpia la nueva caja
+        document.getElementById('p_granel').checked = false; 
         window.cargarInventarioGeneral(); 
     } catch (err) {}
 };
+
 window.abrirModalEdicion = (sku) => { const p = window.inventarioLocal.find(x => x.sku === sku); if(!p) return; document.getElementById('edit_sku').value = p.sku; document.getElementById('edit_nom').value = p.nombre; document.getElementById('edit_cat').value = p.categoria || "General"; if(document.getElementById('edit_prov')) document.getElementById('edit_prov').value = p.proveedor || ""; document.getElementById('edit_cos').value = p.costo||0; document.getElementById('edit_pre').value = p.precio||0; document.getElementById('edit_promo').value = p.precio_promo || 0; document.getElementById('edit_mayoreo').value = p.precio_mayoreo || 0; document.getElementById('edit_cant_mayoreo').value = p.cant_mayoreo || 0; document.getElementById('edit_stk').value = p.stock||0; document.getElementById('edit_min').value = p.min_stk || 0; document.getElementById('edit_max').value = p.max_stk || 0; document.getElementById('edit_granel').checked = p.es_granel || false; document.getElementById('edit_caducidad').value = p.caducidad || ""; document.getElementById('modalEdicion').classList.remove('hidden'); };
 window.cerrarModalEdicion = () => { document.getElementById('modalEdicion').classList.add('hidden'); };
 window.guardarEdicionProducto = async () => { 
