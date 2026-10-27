@@ -510,24 +510,40 @@ window.procesarVentaCompleta = async () => {
     const u = localStorage.getItem('currentUser'); 
     const nVend = localStorage.getItem('numVendedor');
     
-    // El interruptor: si tiene teléfono, lo formatea. Si no, solo pone el nombre.
-    const textoCajero = nVend ? `Vendedor: ${u} - Tel: ${nVend}` : `Cajero: ${u}`;
+    const textoCajero = nVend ? `Vendedor: ${u} Tel: ${nVend}` : `Cajero: ${u}`;
     
     const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0;
+    
     try {
         for (const i of window.carrito) { 
             const sub = i.precioVentaReal * i.cantidad; tot += sub; 
             const ref = doc(db, `${e}_Inventario_${z}`, i.sku); 
             const nuevoStock = i.stock - i.cantidad;
             
-            // Agregamos .catch(()=>{}) para absorber errores de red y evitar bloqueos en procesador
+            // 🚀 REPARACIÓN: Actualización en la nube en segundo plano sin bloquear interfaz
             setDoc(ref, { stock: nuevoStock }, { merge: true }).catch(()=>{}); 
-            addDoc(collection(db, `${e}_Historial_Ventas`), { sku: i.sku, nombre: i.nombre, categoria: i.categoria||'General', cantidad: i.cantidad, precioVenta: i.precioVentaReal, zona: z, usuario: u, fechaRegistro: f, timestamp: ts }).catch(()=>{}); 
+            addDoc(collection(db, `${e}_Historial_Ventas`), { 
+                sku: i.sku, 
+                nombre: i.nombre, 
+                categoria: i.categoria || 'General', 
+                cantidad: i.cantidad, 
+                precioVenta: i.precioVentaReal, 
+                precio_sugerido: i.precio_sugerido || 0, 
+                zona: z, 
+                usuario: u, 
+                fechaRegistro: f, 
+                timestamp: ts 
+            }).catch(()=>{}); 
             
+            // 🚀 REPARACIÓN: Reflejar cambios de stock inmediatamente en la memoria local Dexie.js
             let itemLocal = window.inventarioLocal.find(x => x.sku === i.sku);
-            if(itemLocal) itemLocal.stock = nuevoStock;
+            if(itemLocal) {
+                itemLocal.stock = nuevoStock;
+                await window.localDB.inventario.put(itemLocal).catch(()=>{});
+            }
         }
         
+        // Generar ticket visual con soporte para precio sugerido
         window.generarHTMLTicket(window.carrito, tot, eNombre, z, textoCajero, f);
         document.getElementById('modal-ticket').classList.remove('hidden');
 
