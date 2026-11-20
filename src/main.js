@@ -164,7 +164,89 @@ window.buscarEnCatalogoGlobal = async (skuBuscado) => {
         if (docSnap.exists()) { const d = docSnap.data(); window.abrirModalRegistroRapido(skuBuscado, d.nombre, d.costo_promedio); window.mostrarNotificacion("✨ Producto encontrado."); } 
         else { window.abrirModalRegistroRapido(skuBuscado, "", ""); window.mostrarNotificacion("⚠️ Producto nuevo."); } } catch (e) { window.abrirModalRegistroRapido(skuBuscado, "", ""); }
 };
+window.buscarEnCatalogoGlobal = async (skuBuscado) => {
+    document.getElementById('venta_busqueda').value = skuBuscado; 
+    if(String(skuBuscado).trim().length < 8) { window.abrirModalRegistroRapido(skuBuscado, "", ""); return window.mostrarNotificacion("📝 Código corto. Registro local."); }
+    window.mostrarNotificacion("🔍 Buscando en la red BOOMBOX...");
+    try { const docRef = doc(db, "SaaS_Catalogo_Global", skuBuscado); const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) { const d = docSnap.data(); window.abrirModalRegistroRapido(skuBuscado, d.nombre, d.costo_promedio); window.mostrarNotificacion("✨ Producto encontrado."); } 
+        else { window.abrirModalRegistroRapido(skuBuscado, "", ""); window.mostrarNotificacion("⚠️ Producto nuevo."); } } catch (e) { window.abrirModalRegistroRapido(skuBuscado, "", ""); }
+};
 
+// 👇 AQUÍ PEGAS LAS NUEVAS FUNCIONES SIN BORRAR LA DE ARRIBA
+window.autocompletarBodega = (p, esGlobal = false) => {
+    document.getElementById('p_sku').value = p.sku;
+    document.getElementById('p_nom').value = p.nombre;
+    
+    if (esGlobal) {
+        document.getElementById('p_cos').value = p.costo_promedio ? Number(p.costo_promedio).toFixed(2) : '';
+        window.mostrarNotificacion(`🌐 Encontrado en Catálogo Global: ${p.nombre}`);
+    } else {
+        document.getElementById('p_cat').value = p.categoria || '';
+        if (document.getElementById('p_prov')) document.getElementById('p_prov').value = p.proveedor || '';
+        document.getElementById('p_cos').value = p.costo || '';
+        if (document.getElementById('p_sugerido')) document.getElementById('p_sugerido').value = p.precio_sugerido || '';
+        document.getElementById('p_pre').value = p.precio || '';
+        document.getElementById('p_mayoreo').value = p.precio_mayoreo || '';
+        document.getElementById('p_cant_mayoreo').value = p.cant_mayoreo || '';
+        document.getElementById('p_min').value = p.min_stk || '';
+        document.getElementById('p_max').value = p.max_stk || '';
+        document.getElementById('p_granel').checked = p.es_granel || false;
+        window.mostrarNotificacion(`🔄 Producto cargado (Stock actual: ${p.stock})`);
+    }
+    
+    const stkInput = document.getElementById('p_stk');
+    stkInput.value = '';
+    stkInput.focus();
+};
+
+window.buscarProductoBodega = async (origen) => {
+    const sugBox = document.getElementById('sugerencias_bodega');
+    if (origen === 'sku') {
+        const skuVal = document.getElementById('p_sku').value.trim();
+        if (!skuVal) return;
+
+        // 1. Buscar primero en inventario local (0 ms, funciona offline)
+        const exactoLocal = window.inventarioLocal.find(x => x.sku.toLowerCase() === skuVal.toLowerCase());
+        if (exactoLocal) {
+            window.autocompletarBodega(exactoLocal, false);
+            if (sugBox) sugBox.classList.add('hidden');
+            return;
+        }
+
+        // 2. Si es código de barras (>= 8 dígitos), no está en tu inventario y hay red, consultar red global de clientes
+        if (skuVal.length >= 8 && navigator.onLine) {
+            try {
+                const docSnap = await getDoc(doc(db, "SaaS_Catalogo_Global", skuVal));
+                if (docSnap.exists()) {
+                    window.autocompletarBodega(docSnap.data(), true);
+                }
+            } catch (e) {}
+        }
+    } else {
+        const nomVal = document.getElementById('p_nom').value.trim().toLowerCase();
+        if (!sugBox) return;
+        if (nomVal.length < 2) { sugBox.classList.add('hidden'); return; }
+        
+        const matches = window.inventarioLocal.filter(x => x.nombre.toLowerCase().includes(nomVal) || x.sku.toLowerCase().includes(nomVal));
+        if (matches.length > 0) {
+            sugBox.innerHTML = '';
+            sugBox.classList.remove('hidden');
+            matches.slice(0, 8).forEach(p => {
+                const div = document.createElement('div');
+                div.className = "p-2.5 hover:bg-orange-50 cursor-pointer border-b text-xs flex justify-between items-center";
+                div.innerHTML = `<span class="font-bold text-gray-800">${p.nombre}</span><span class="text-gray-500 font-mono">SKU: ${p.sku} (Stk: ${p.stock})</span>`;
+                div.onclick = () => {
+                    window.autocompletarBodega(p, false);
+                    sugBox.classList.add('hidden');
+                };
+                sugBox.appendChild(div);
+            });
+        } else {
+            sugBox.classList.add('hidden');
+        }
+    }
+};
 window.toggleAuth = () => { document.getElementById('loginForm').classList.toggle('hidden'); document.getElementById('registerForm').classList.toggle('hidden'); };
 window.cambiarPestaña = (idTab) => {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden')); document.querySelectorAll('button[id^="btn-tab-"]').forEach(btn => { btn.classList.remove('tab-active', 'border-b-4', 'border-orange-500', 'text-orange-600'); btn.classList.add('text-gray-600'); });
@@ -355,10 +437,20 @@ if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuar
 
 let scanners = { ventas: null, ingreso: null };
 window.iniciarCamara = (m) => { 
-    document.getElementById(`reader-${m}`).classList.remove('hidden'); document.getElementById(`btn-iniciar-camara-${m}`).classList.add('hidden'); document.getElementById(`btn-detener-camara-${m}`).classList.remove('hidden');
-    scanners[m] = new Html5Qrcode(`reader-${m}`); scanners[m].start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (decodedText) => {
-        window.detenerCamara(m); if (navigator.vibrate) navigator.vibrate(100); 
-        if(m === 'ventas') { const p = window.inventarioLocal.find(x => x.sku === decodedText); if(p) { window.agregarAlCarrito(p); } else { window.buscarEnCatalogoGlobal(decodedText); } } else { document.getElementById('p_sku').value = decodedText; }
+    document.getElementById(`reader-${m}`).classList.remove('hidden'); 
+    document.getElementById(`btn-iniciar-camara-${m}`).classList.add('hidden'); 
+    document.getElementById(`btn-detener-camara-${m}`).classList.remove('hidden');
+    scanners[m] = new Html5Qrcode(`reader-${m}`); 
+    scanners[m].start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (decodedText) => {
+        window.detenerCamara(m); 
+        if (navigator.vibrate) navigator.vibrate(100); 
+        if(m === 'ventas') { 
+            const p = window.inventarioLocal.find(x => x.sku === decodedText); 
+            if(p) { window.agregarAlCarrito(p); } else { window.buscarEnCatalogoGlobal(decodedText); } 
+        } else { 
+            document.getElementById('p_sku').value = decodedText; 
+            window.buscarProductoBodega('sku');
+        }
     }, (e) => { }).catch(err => { window.mostrarNotificacion("❌ Cámara bloqueada."); });
 };
 window.detenerCamara = (m) => { if(scanners[m]) { scanners[m].stop().then(() => { document.getElementById(`reader-${m}`).classList.add('hidden'); document.getElementById(`btn-iniciar-camara-${m}`).classList.remove('hidden'); document.getElementById(`btn-detener-camara-${m}`).classList.add('hidden'); }).catch(e=>console.log(e)); } };
@@ -466,8 +558,16 @@ window.filtrarProductosVenta = () => {
     const r = window.inventarioLocal.filter(p => p.sku.toLowerCase().includes(i) || p.nombre.toLowerCase().includes(i));
     if (r.length > 0) { c.classList.remove('hidden'); r.forEach(p => { const precioActivo = window.calcularPrecioExacto(p, 1); const textoPromo = (precioActivo !== p.precio) ? `<span class="text-xs text-red-500 line-through mr-2">$${p.precio}</span>` : ''; const d = document.createElement('div'); d.className = "p-4 hover:bg-orange-50 cursor-pointer border-b flex justify-between items-center"; d.innerHTML = `<div><span class="text-orange-600 font-bold">${p.sku}</span><br><span class="text-gray-700">${p.nombre}</span></div> <div>${textoPromo}<span class="text-green-600 font-bold">$${precioActivo}</span></div>`; d.onclick = () => { window.agregarAlCarrito(p); document.getElementById('venta_busqueda').value = ''; c.classList.add('hidden'); }; c.appendChild(d); }); } else { c.classList.add('hidden'); }
 };
-document.addEventListener('click', (e) => { if(e.target.id !== 'venta_busqueda') document.getElementById('sugerencias_venta').classList.add('hidden'); });
-
+document.addEventListener('click', (e) => { 
+    if(e.target.id !== 'venta_busqueda') {
+        const sv = document.getElementById('sugerencias_venta');
+        if (sv) sv.classList.add('hidden');
+    }
+    if(e.target.id !== 'p_nom') {
+        const sb = document.getElementById('sugerencias_bodega');
+        if (sb) sb.classList.add('hidden');
+    }
+});
 window.agregarAlCarrito = (p) => {
     // 🚀 REPARACIÓN: Barrera de stock eliminada para permitir cobro en negativo
     const ex = window.carrito.find(i => i.sku === p.sku);
