@@ -575,31 +575,77 @@ window.cargarProveedores = async () => { const e = localStorage.getItem('empresa
 window.eliminarProveedor = async (id) => { if(!confirm("¿Borrar este proveedor?")) return; const e = localStorage.getItem('empresaId'); try { await deleteDoc(doc(db, `${e}_Proveedores`, id)); window.cargarProveedores(); } catch(er) {} };
 
 window.guardarProducto = async () => {
-    const sku = document.getElementById('p_sku').value.trim(); const nom = document.getElementById('p_nom').value.trim(); const cat = document.getElementById('p_cat').value.trim() || "General"; const prov = document.getElementById('p_prov')?.value || ""; const cos = parseFloat(document.getElementById('p_cos').value) || 0; const pre = parseFloat(document.getElementById('p_pre').value) || 0; const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; const stk = parseFloat(document.getElementById('p_stk').value) || 0; const minS = parseFloat(document.getElementById('p_min').value) || 0; const maxS = parseFloat(document.getElementById('p_max').value) || 0; 
-    // 🚀 NUEVO: Capturar el precio sugerido
+    const sku = document.getElementById('p_sku').value.trim(); 
+    const nom = document.getElementById('p_nom').value.trim(); 
+    const cat = document.getElementById('p_cat').value.trim() || "General"; 
+    const prov = document.getElementById('p_prov')?.value || ""; 
+    const cos = parseFloat(document.getElementById('p_cos').value) || 0; 
+    const pre = parseFloat(document.getElementById('p_pre').value) || 0; 
+    const pMay = parseFloat(document.getElementById('p_mayoreo').value) || 0; 
+    const cMay = parseFloat(document.getElementById('p_cant_mayoreo').value) || 0; 
+    const stk = parseFloat(document.getElementById('p_stk').value) || 0; 
+    const minS = parseFloat(document.getElementById('p_min').value) || 0; 
+    const maxS = parseFloat(document.getElementById('p_max').value) || 0; 
     const pSug = parseFloat(document.getElementById('p_sugerido')?.value) || 0; 
-    const isGranel = document.getElementById('p_granel').checked; const cad = document.getElementById('p_caducidad').value || null; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const u = localStorage.getItem('currentUser'); const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); if(!sku || !nom) return window.mostrarNotificacion("⚠️ SKU y Nombre obligatorios.");
+    const isGranel = document.getElementById('p_granel').checked; 
+    const cad = document.getElementById('p_caducidad').value || null; 
+    
+    if(!sku || !nom) return window.mostrarNotificacion("⚠️ SKU y Nombre obligatorios.");
+
+    const z = document.getElementById('zonaSelect').value; 
+    const e = localStorage.getItem('empresaId'); 
+    const u = localStorage.getItem('currentUser'); 
+    const ts = Date.now(); 
+    const f = new Date(ts).toLocaleString('es-MX'); 
+
     try { 
         const r = `${e}_Inventario_${z}`; 
-        const d = await getDoc(doc(db, r, sku)); 
-        let sF = stk; if (d.exists()) sF += d.data().stock; 
         
-        // 🚀 NUEVO: Inyectar precio_sugerido a la base de datos sin alterar el costo real
-        const nuevoProducto = { sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, precio_promo: 0, precio_sugerido: pSug };
+        // 1. Consulta stock existente en memoria local / Dexie (0 ms, sin bloquear por internet)
+        const existente = window.inventarioLocal.find(x => x.sku === sku) || await window.localDB.inventario.get(sku);
+        let sF = stk; 
+        if (existente && typeof existente.stock === 'number') {
+            sF += existente.stock; 
+        }
         
-        await setDoc(doc(db, r, sku), nuevoProducto, { merge: true }); 
-        await addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }); 
-        await window.actualizarCatalogoGlobal(sku, nom, cos); 
+        const nuevoProducto = { 
+            sku, nombre: nom, categoria: cat, proveedor: prov, costo: cos, precio: pre, 
+            precio_mayoreo: pMay, cant_mayoreo: cMay, es_granel: isGranel, stock: sF, 
+            min_stk: minS, max_stk: maxS, caducidad: cad, zona: z, 
+            precio_promo: existente ? (existente.precio_promo || 0) : 0, 
+            precio_sugerido: pSug 
+        };
         
+        // 2. Guardado inmediato en Dexie.js y arreglo en memoria
         await window.localDB.inventario.put(nuevoProducto);
+        const idx = window.inventarioLocal.findIndex(x => x.sku === sku);
+        if (idx !== -1) {
+            window.inventarioLocal[idx] = nuevoProducto;
+        } else {
+            window.inventarioLocal.push(nuevoProducto);
+        }
+
+        // 3. Sincronización con la nube en segundo plano (sin await para evitar congelamientos)
+        setDoc(doc(db, r, sku), nuevoProducto, { merge: true }).catch(()=>{}); 
+        addDoc(collection(db, `${e}_Historial_Ingresos`), { sku, nombre: nom, cantidad: stk, zona: z, usuario: u, fechaRegistro: f, timestamp: ts, tipoMovimiento: "ENTRADA" }).catch(()=>{}); 
+        if (window.actualizarCatalogoGlobal) window.actualizarCatalogoGlobal(sku, nom, cos).catch(()=>{}); 
         
-        window.mostrarNotificacion("📦 Producto ingresado correctamente"); 
-        ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => document.getElementById(id).value = ''); 
+        window.mostrarNotificacion(`📦 Ingresado: ${nom} (Nuevo stock: ${sF})`); 
+        ['p_sku','p_nom','p_cat','p_cos','p_pre','p_mayoreo','p_cant_mayoreo','p_stk','p_min','p_max','p_caducidad'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.value = '';
+        }); 
         if(document.getElementById('p_prov')) document.getElementById('p_prov').value = ''; 
-        if(document.getElementById('p_sugerido')) document.getElementById('p_sugerido').value = ''; // Limpia la nueva caja
+        if(document.getElementById('p_sugerido')) document.getElementById('p_sugerido').value = ''; 
         document.getElementById('p_granel').checked = false; 
-        window.cargarInventarioGeneral(); 
-    } catch (err) {}
+        const sugBox = document.getElementById('sugerencias_bodega');
+        if (sugBox) sugBox.classList.add('hidden');
+
+        window.renderInventarioPantalla(); 
+    } catch (err) {
+        console.error(err);
+        window.mostrarNotificacion("❌ Error al guardar el producto.");
+    }
 };
 
 window.abrirModalEdicion = (sku) => { 

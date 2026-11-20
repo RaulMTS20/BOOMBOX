@@ -200,8 +200,11 @@
                         <button id="btn-detener-camara-ingreso" onclick="detenerCamara('ingreso')" class="w-full py-2 bg-red-600 text-white rounded-xl font-bold text-xs hidden">❌ Apagar</button>
                         <div id="reader-ingreso" class="hidden"></div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <input type="text" id="p_sku" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="SKU">
-                            <input type="text" id="p_nom" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Nombre">
+                            <input type="text" id="p_sku" oninput="buscarProductoBodega('sku')" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="SKU">
+<div class="relative">
+    <input type="text" id="p_nom" oninput="buscarProductoBodega('nombre')" class="w-full p-3 border-2 rounded-xl text-sm font-bold" placeholder="Nombre">
+    <div id="sugerencias_bodega" class="absolute left-0 right-0 top-full bg-white border-2 rounded-xl mt-1 max-h-48 overflow-y-auto shadow-xl z-50 hidden"></div>
+</div>
                             <input type="text" id="p_cat" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Categoría">
                             <select id="p_prov" class="p-3 border-2 rounded-xl text-sm font-bold bg-gray-50"></select>
                             <input type="number" id="p_cos" class="p-3 border-2 rounded-xl text-sm font-bold" placeholder="Costo">
@@ -389,8 +392,7 @@
         </div>
     </div>
 
-    <script type="module" src="/src/main.js?v=1.20"></script>
-    <script type="module" src="/src/main.js?v=1.20"></script>
+    <script type="module" src="/src/main.js?v=1.21"></script>
     
     <!-- 🚀 REGISTRO DE SERVICE WORKER PARA MODO OFFLINE -->
     <script>
