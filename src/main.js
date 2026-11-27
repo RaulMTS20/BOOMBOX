@@ -255,7 +255,11 @@ window.cambiarPestaña = (idTab) => {
     if(idTab === 'tab-general' || idTab === 'tab-ventas') window.cargarInventarioGeneral(); if(idTab === 'tab-kardex') window.cargarKardex(window.kardexActual); if(idTab === 'tab-usuarios') window.cargarUsuarios(); if(idTab === 'tab-agotados') window.renderAgotados(); if(idTab === 'tab-proveedores') window.cargarProveedores();
     if(idTab === 'tab-reportes') { const f = new Date(); const hoy = f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0'); document.getElementById('rep_fin').value = hoy; document.getElementById('rep_inicio').value = hoy; const selectCat = document.getElementById('rep_cat'); if(selectCat) selectCat.value = 'Todas'; window.generarReporte(); }
 };
-window.alCambiarZona = () => { window.cargarInventarioGeneral(); if(!document.getElementById('tab-kardex').classList.contains('hidden')) window.cargarKardex(window.kardexActual); if(!document.getElementById('tab-reportes').classList.contains('hidden')) window.generarReporte(); };
+window.alCambiarZona = async () => { 
+    await window.sincronizarInventarioNube(); 
+    if(!document.getElementById('tab-kardex').classList.contains('hidden')) window.cargarKardex(window.kardexActual); 
+    if(!document.getElementById('tab-reportes').classList.contains('hidden')) window.generarReporte(); 
+};
 window.calcularPrecioExacto = (p, cantVenta) => { let pFinal = p.precio; if (p.precio_promo && p.precio_promo > 0) pFinal = p.precio_promo; if (p.cant_mayoreo > 0 && cantVenta >= p.cant_mayoreo && p.precio_mayoreo > 0) pFinal = p.precio_mayoreo; return pFinal; };
 
 // 📍 NUEVAS FUNCIONES REGISTRO (GIRO Y GPS)
@@ -367,22 +371,19 @@ window.iniciarSesion = async () => {
 
 window.recuperarPassword = async () => { const u = prompt("Ingresa tu Usuario:"); if(!u) return; try { const dirDoc = await getDoc(doc(db, "SaaS_Directorio", u)); if(!dirDoc.exists()) return window.mostrarNotificacion("❌ No existe el usuario."); await sendPasswordResetEmail(auth, dirDoc.data().email); window.mostrarNotificacion(`✅ Enlace enviado al correo.`); } catch(e) { window.mostrarNotificacion("❌ Error."); } };
 window.cerrarSesion = () => { localStorage.clear(); location.reload(); };
-
-function iniciarApp() {
+async function iniciarApp() {
     try {
-        document.getElementById('authScreen').classList.add('hidden'); document.getElementById('appScreen').classList.remove('hidden');
-    // Actualización segura de la interfaz (Evita colapsos si falta el HTML)
-const lblEmpresa = document.getElementById('displayEmpresa');
-if (lblEmpresa) lblEmpresa.innerText = eNombre;
-// Llenar el botón desplegable con las sucursales (zonas)
+        document.getElementById('authScreen').classList.add('hidden'); 
+        document.getElementById('appScreen').classList.remove('hidden');
+
+        const lblEmpresa = document.getElementById('displayEmpresa');
+        if (lblEmpresa) lblEmpresa.innerText = localStorage.getItem('empresaNombre') || localStorage.getItem('empresaId') || "";
+
         const selectZona = document.getElementById('zonaSelect');
         if (selectZona) {
-            selectZona.innerHTML = ""; // Limpia el botón por si hay basura
+            selectZona.innerHTML = "";
             let zonasGuardadas = [];
-            try { 
-                zonasGuardadas = JSON.parse(localStorage.getItem('zonas') || "[]"); 
-            } catch(e) {}
-            
+            try { zonasGuardadas = JSON.parse(localStorage.getItem('zonas') || "[]"); } catch(e) {}
             zonasGuardadas.forEach(zona => {
                 const opcion = document.createElement('option');
                 opcion.value = zona;
@@ -391,26 +392,23 @@ if (lblEmpresa) lblEmpresa.innerText = eNombre;
             });
         }
 
-const lblUsuario = document.getElementById('displayUsuario');
-if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuario";
-// 🔐 VALIDACIÓN DE ROLES Y PERMISOS (Restaurada y a prueba de fallos)
+        const lblUsuario = document.getElementById('displayUser') || document.getElementById('displayUsuario');
+        if (lblUsuario) lblUsuario.innerText = localStorage.getItem('currentUser') || "Usuario";
+
         const rolActual = localStorage.getItem('userRol');
-        
         if (rolActual === 'Dueño' || rolActual === 'Gerente') {
             ['btn-tab-registro', 'btn-tab-kardex', 'btn-tab-reportes'].forEach(id => {
                 const boton = document.getElementById(id);
                 if (boton) boton.classList.remove('hidden');
             });
         }
-        
         if (rolActual === 'Dueño') {
             const botonUsuarios = document.getElementById('btn-tab-usuarios');
             if (botonUsuarios) botonUsuarios.classList.remove('hidden');
         }
-// 🚀 LÓGICA DE VISIBILIDAD DE REPORTES
+
         const giroEmpresa = localStorage.getItem('empresaGiro') || 'Otro';
         const btnReportes = document.getElementById('btn-tab-reportes');
-
         if (btnReportes) {
             if (rolActual === 'Dueño' || rolActual === 'Gerente' || (giroEmpresa === 'Cambaceo' && rolActual === 'Vendedor')) {
                 btnReportes.classList.remove('hidden');
@@ -419,21 +417,26 @@ if (lblUsuario) lblUsuario.innerText = localStorage.getItem('usuario') || "Usuar
             }
         }
 
-        // 🔄 SINCRONIZACIÓN AUTOMÁTICA AL INICIAR
-        if (navigator.onLine) {
-            window.sincronizarInventarioNube(); // Fuerza la descarga de Firebase a Dexie
+        // 🔒 CANDADO DE AHORRO DE LECTURAS: Solo descarga 1 vez al día por zona
+        const z = selectZona ? selectZona.value : '';
+        const hoyStr = new Date().toISOString().split('T')[0];
+        const llaveSync = `ultimaSync_${z}`;
+        const ultimaSync = localStorage.getItem(llaveSync);
+        const totalLocal = await window.localDB.inventario.count();
+
+        if (navigator.onLine && (ultimaSync !== hoyStr || totalLocal === 0)) {
+            await window.sincronizarInventarioNube();
         } else {
-            window.cargarInventarioGeneral(); // Si no hay internet, carga directo de Dexie
+            await window.cargarInventarioGeneral(); // 0 lecturas a Firebase
         }
+
         window.cargarProveedores(); 
         window.cambiarPestaña('tab-ventas');
         
     } catch (err) { 
-            console.error("💥 ERROR FATAL REVELADO:", err); 
-            // window.cerrarSesion(); 
-        }
+        console.error("💥 ERROR FATAL REVELADO:", err); 
     }
-
+}
 
 let scanners = { ventas: null, ingreso: null };
 window.iniciarCamara = (m) => { 
@@ -457,30 +460,56 @@ window.detenerCamara = (m) => { if(scanners[m]) { scanners[m].stop().then(() => 
 
 function poblarFiltros() { let htmlCat = `<option value="Todas">Todas las categorías</option>`; window.categoriasUnicas.forEach(c => { if(c) htmlCat += `<option value="${c}">${c}</option>`; }); const els = ['filtro_inv_cat', 'alerta_filtro_cat', 'rep_cat']; els.forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = htmlCat; }); }
 
-// 🔄 PUENTE DE DESCARGA (NUBE -> LOCAL)
+// 🔄 PUENTE DE DESCARGA (NUBE -> LOCAL CON SUBIDA DE PENDIENTES Y CANDADO DIARIO)
 window.sincronizarInventarioNube = async () => {
     const z = document.getElementById('zonaSelect').value;
     const e = localStorage.getItem('empresaId');
     if(!z || !e) return;
 
-    window.mostrarNotificacion("⏳ Descargando inventario de la nube al disco local...");
+    if (!navigator.onLine) {
+        window.mostrarNotificacion("⚠️ Sin internet. Usando memoria local.");
+        return window.cargarInventarioGeneral();
+    }
+
+    window.mostrarNotificacion("⏳ Sincronizando con la nube...");
     
     try {
+        // 1. Subir primero ventas pendientes hechas sin internet
+        const pendientes = await window.localDB.ventas_pendientes.toArray();
+        if (pendientes.length > 0) {
+            for (const p of pendientes) {
+                if (p.payload) {
+                    await addDoc(collection(db, `${e}_Historial_Ventas`), p.payload);
+                    for (const item of (p.payload.items || [])) {
+                        const localItem = await window.localDB.inventario.get(item.sku);
+                        if (localItem) {
+                            await setDoc(doc(db, `${e}_Inventario_${z}`, item.sku), { stock: localItem.stock }, { merge: true });
+                        }
+                    }
+                }
+                await window.localDB.ventas_pendientes.delete(p.id);
+            }
+        }
+
+        // 2. Descargar inventario actualizado y sellar fecha del candado diario
         const q = query(collection(db, `${e}_Inventario_${z}`));
         const sn = await getDocs(q);
         
         const productosDescargados = [];
         sn.forEach((d) => { productosDescargados.push(d.data()); });
         
-        // AQUÍ ESTÁ EL CAMBIO (window.localDB)
         await window.localDB.inventario.clear();
         await window.localDB.inventario.bulkPut(productosDescargados);
         
-        window.mostrarNotificacion(`✅ ${productosDescargados.length} productos listos para uso Offline.`);
+        const hoyStr = new Date().toISOString().split('T')[0];
+        localStorage.setItem(`ultimaSync_${z}`, hoyStr);
+        
+        window.mostrarNotificacion(`✅ ${productosDescargados.length} productos sincronizados (Candado activo hoy).`);
         window.cargarInventarioGeneral(); 
     } catch (err) {
         console.error(err);
-        window.mostrarNotificacion("❌ Error en la descarga inicial. Revisa tu internet.");
+        window.mostrarNotificacion("❌ Error al sincronizar. Usando datos locales.");
+        window.cargarInventarioGeneral();
     }
 };
 
@@ -606,49 +635,78 @@ window.renderCarrito = () => {
 window.procesarVentaCompleta = async () => {
     if (window.carrito.length === 0) return window.mostrarNotificacion("⚠️ El carrito está vacío."); 
     const btn = document.getElementById('btn-cobrar'); btn.disabled = true; btn.innerText = "Procesando..."; 
-    const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const eNombre = localStorage.getItem('empresaNombre') || e; 
+    
+    const z = document.getElementById('zonaSelect').value; 
+    const e = localStorage.getItem('empresaId'); 
+    const eNombre = localStorage.getItem('empresaNombre') || e; 
     const u = localStorage.getItem('currentUser'); 
     const nVend = localStorage.getItem('numVendedor');
-    
     const textoCajero = nVend ? `Vendedor: ${u} Tel: ${nVend}` : `Cajero: ${u}`;
     
-    const ts = Date.now(); const f = new Date(ts).toLocaleString('es-MX'); let tot = 0;
-    
+    const ts = Date.now(); 
+    const f = new Date(ts).toLocaleString('es-MX'); 
+    const folioTicket = `TK-${ts.toString().slice(-6)}`; // Folio único del ticket
+    let tot = 0;
+    let itemsTicket = [];
+
     try {
         for (const i of window.carrito) { 
-            const sub = i.precioVentaReal * i.cantidad; tot += sub; 
-            const ref = doc(db, `${e}_Inventario_${z}`, i.sku); 
+            const sub = i.precioVentaReal * i.cantidad; 
+            tot += sub; 
             const nuevoStock = i.stock - i.cantidad;
+
+            // Empaquetamos cada producto dentro del arreglo del ticket único
+            itemsTicket.push({
+                sku: i.sku,
+                nombre: i.nombre,
+                categoria: i.categoria || 'General',
+                cantidad: i.cantidad,
+                precioVenta: i.precioVentaReal,
+                precio_sugerido: i.precio_sugerido || 0,
+                subtotal: sub
+            });
             
-            // 🚀 REPARACIÓN: Actualización en la nube en segundo plano sin bloquear interfaz
+            // Actualización de stock en la nube en segundo plano
+            const ref = doc(db, `${e}_Inventario_${z}`, i.sku); 
             setDoc(ref, { stock: nuevoStock }, { merge: true }).catch(()=>{}); 
-            addDoc(collection(db, `${e}_Historial_Ventas`), { 
-                sku: i.sku, 
-                nombre: i.nombre, 
-                categoria: i.categoria || 'General', 
-                cantidad: i.cantidad, 
-                precioVenta: i.precioVentaReal, 
-                precio_sugerido: i.precio_sugerido || 0, 
-                zona: z, 
-                usuario: u, 
-                fechaRegistro: f, 
-                timestamp: ts 
-            }).catch(()=>{}); 
             
-            // 🚀 REPARACIÓN: Reflejar cambios de stock inmediatamente en la memoria local Dexie.js
+            // Actualización inmediata en Dexie.js y memoria local
             let itemLocal = window.inventarioLocal.find(x => x.sku === i.sku);
             if(itemLocal) {
                 itemLocal.stock = nuevoStock;
                 await window.localDB.inventario.put(itemLocal).catch(()=>{});
             }
         }
+
+        // 🚀 1 SOLO DOCUMENTO POR TICKET COMPLETO (Ahorra hasta 90% de escrituras en Firebase)
+        const ticketCompleto = {
+            folio: folioTicket,
+            items: itemsTicket,
+            total: tot,
+            zona: z,
+            usuario: u,
+            fechaRegistro: f,
+            timestamp: ts
+        };
+
+        // Intentar subir el ticket único a Firebase; si falla (sin red), guardarlo en cola Dexie
+        addDoc(collection(db, `${e}_Historial_Ventas`), ticketCompleto).catch(async () => {
+            await window.localDB.ventas_pendientes.add({
+                sku: folioTicket,
+                cantidad: itemsTicket.length,
+                total: tot,
+                timestamp: ts,
+                payload: ticketCompleto
+            }).catch(()=>{});
+        });
         
-        // Generar ticket visual con soporte para precio sugerido
         window.generarHTMLTicket(window.carrito, tot, eNombre, z, textoCajero, f);
         document.getElementById('modal-ticket').classList.remove('hidden');
 
         window.carrito = []; window.renderCarrito(); window.renderInventarioPantalla(); 
-        if(!document.getElementById('tab-agotados').classList.contains('hidden')) window.renderAgotados();
+        const tabAgotados = document.getElementById('tab-agotados');
+        if(tabAgotados && !tabAgotados.classList.contains('hidden')) window.renderAgotados();
+        
         document.getElementById('cobro_efectivo').value = ''; 
         window.calcularCambio();
         btn.disabled = false; btn.innerText = "✅ Cobrar"; 
@@ -835,14 +893,12 @@ window.generarReporte = async () => {
     let fIniStr = document.getElementById('rep_inicio').value; 
     let fFinStr = document.getElementById('rep_fin').value; 
     
-    // 1. FECHA AUTOMÁTICA POR DEFECTO
     if(!fIniStr || !fFinStr) {
         const f = new Date(); 
         const hoy = f.getFullYear() + '-' + String(f.getMonth() + 1).padStart(2, '0') + '-' + String(f.getDate()).padStart(2, '0');
         document.getElementById('rep_inicio').value = hoy;
         document.getElementById('rep_fin').value = hoy;
-        fIniStr = hoy;
-        fFinStr = hoy;
+        fIniStr = hoy; fFinStr = hoy;
     }
 
     const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const fCat = document.getElementById('rep_cat').value; 
@@ -855,7 +911,7 @@ window.generarReporte = async () => {
 
     let totalDinero = 0; let cantVentas = 0; let cantTickets = 0; 
     let hDetalle = ""; let hConsolidado = "";
-    window.datosReporteCSV = [["Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; 
+    window.datosReporteCSV = [["Folio_Ticket", "Fecha", "Vendedor", "SKU", "Producto", "Categoria", "Cantidad", "Total_Venta"]]; 
     
     let valorStockInfo = 0; 
     window.inventarioLocal.forEach(p => { if(p.stock > 0) { valorStockInfo += (parseFloat(p.costo) || 0) * p.stock; } }); 
@@ -864,52 +920,76 @@ window.generarReporte = async () => {
     try { 
         const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); 
         const vSn = await getDocs(qVentas); 
-        let ventasPeriodo = []; 
+        let ticketsPeriodo = []; 
         let consolidados = {}; 
 
         vSn.forEach(d => { 
             const v = d.data(); 
             if(v.timestamp >= tInicio && v.timestamp <= tFin) { 
-                if(fCat === 'Todas' || v.categoria === fCat) { 
-                    ventasPeriodo.push({ ...v, id: d.id }); 
-                    totalDinero += (v.precioVenta * v.cantidad); 
-                    cantVentas += v.cantidad; 
-                    
-                    // 2. CONSOLIDAR PRODUCTOS
-                    if(!consolidados[v.sku]) {
-                        consolidados[v.sku] = { sku: v.sku, nombre: v.nombre, cantidadTotal: 0, ingresoTotal: 0 };
+                // Soporta tickets nuevos (con arreglo items) y ventas viejas (1 producto)
+                const listaItems = Array.isArray(v.items) ? v.items : [{
+                    sku: v.sku, nombre: v.nombre, categoria: v.categoria || 'General',
+                    cantidad: v.cantidad, precioVenta: v.precioVenta
+                }];
+
+                let totalEsteTicket = 0;
+                let piezasEsteTicket = 0;
+                let resumenNombres = [];
+
+                listaItems.forEach(item => {
+                    if(fCat === 'Todas' || item.categoria === fCat) {
+                        const sub = parseFloat(item.precioVenta) * parseFloat(item.cantidad);
+                        totalDinero += sub;
+                        cantVentas += parseFloat(item.cantidad);
+                        totalEsteTicket += sub;
+                        piezasEsteTicket += parseFloat(item.cantidad);
+                        resumenNombres.push(`${item.cantidad}x ${item.nombre}`);
+
+                        if(!consolidados[item.sku]) {
+                            consolidados[item.sku] = { sku: item.sku, nombre: item.nombre, cantidadTotal: 0, ingresoTotal: 0 };
+                        }
+                        consolidados[item.sku].cantidadTotal += parseFloat(item.cantidad);
+                        consolidados[item.sku].ingresoTotal += sub;
+
+                        window.datosReporteCSV.push([v.folio || d.id.slice(0,6), v.fechaRegistro, v.usuario, item.sku, item.nombre, item.categoria, item.cantidad, sub.toFixed(2)]);
                     }
-                    consolidados[v.sku].cantidadTotal += parseFloat(v.cantidad);
-                    consolidados[v.sku].ingresoTotal += (parseFloat(v.precioVenta) * parseFloat(v.cantidad));
-                } 
+                });
+
+                if (piezasEsteTicket > 0) {
+                    ticketsPeriodo.push({
+                        id: d.id,
+                        folio: v.folio || `TK-${String(v.timestamp).slice(-5)}`,
+                        fechaRegistro: v.fechaRegistro,
+                        timestamp: v.timestamp,
+                        usuario: v.usuario,
+                        resumen: resumenNombres.join(', '),
+                        piezas: piezasEsteTicket,
+                        total: totalEsteTicket
+                    });
+                }
             } 
         }); 
 
-        const ticketsUnicos = new Set(ventasPeriodo.map(v => v.timestamp)); cantTickets = ticketsUnicos.size; const tkPromedio = cantTickets > 0 ? (totalDinero / cantTickets) : 0; 
+        cantTickets = ticketsPeriodo.length; 
+        const tkPromedio = cantTickets > 0 ? (totalDinero / cantTickets) : 0; 
         document.getElementById('rep_total_vendido').innerText = `$${totalDinero.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; 
         document.getElementById('rep_piezas_vendidas').innerText = cantVentas.toLocaleString(); 
         document.getElementById('rep_ticket_promedio').innerText = `$${tkPromedio.toLocaleString('es-MX', {minimumFractionDigits: 2})}`; 
         
-        // 3. PINTAR TABLA CONSOLIDADA
         Object.values(consolidados).sort((a,b) => b.cantidadTotal - a.cantidadTotal).forEach(c => {
             const cantF = c.cantidadTotal % 1 !== 0 ? c.cantidadTotal.toFixed(3) : c.cantidadTotal;
             hConsolidado += `<tr class="border-b hover:bg-gray-50"><td class="p-3 text-xs text-gray-500 font-mono">${c.sku}</td><td class="p-3 font-bold text-indigo-700">${c.nombre}</td><td class="p-3 text-center font-black">${cantF}</td><td class="p-3 text-right text-green-600 font-bold">$${c.ingresoTotal.toFixed(2)}</td></tr>`;
         });
         if (tbConsolidado) tbConsolidado.innerHTML = hConsolidado || "<tr><td colspan='4' class='p-8 text-center text-gray-500'>Sin productos vendidos</td></tr>";
 
-        // 4. PINTAR TABLA DETALLADA (HISTORIAL)
-        ventasPeriodo.sort((a,b) => b.timestamp - a.timestamp); 
+        ticketsPeriodo.sort((a,b) => b.timestamp - a.timestamp); 
         const rolActual = localStorage.getItem('userRol');
         
-        ventasPeriodo.forEach(v => { 
-            const sub = v.precioVenta * v.cantidad; 
-            const cV = v.cantidad % 1 !== 0 ? v.cantidad.toFixed(3) : v.cantidad; 
+        ticketsPeriodo.forEach(tk => { 
+            const pF = tk.piezas % 1 !== 0 ? tk.piezas.toFixed(3) : tk.piezas; 
+            const btnAnular = (rolActual === 'Dueño' || rolActual === 'Gerente') ? `<button onclick="window.anularVenta('${tk.id}')" class="bg-red-100 text-red-600 px-3 py-1 rounded hover:bg-red-200 font-bold text-xs transition">Anular</button>` : '';
             
-            // Botón de anular protegido (solo Dueños y Gerentes)
-            const btnAnular = (rolActual === 'Dueño' || rolActual === 'Gerente') ? `<button onclick="window.anularVenta('${v.id}', '${v.sku}', ${v.cantidad})" class="bg-red-100 text-red-600 px-3 py-1 rounded hover:bg-red-200 font-bold text-xs transition">Anular</button>` : '';
-            
-            hDetalle += `<tr class="border-b hover:bg-gray-50"><td class="p-3 text-[10px] text-gray-500">${v.fechaRegistro}</td><td class="p-3 font-bold">${v.nombre}</td><td class="p-3 text-center">${cV}</td><td class="p-3 text-indigo-600 text-xs">${v.usuario}</td><td class="p-3 text-right text-green-600 font-bold">$${sub.toFixed(2)}</td><td class="p-3 text-center">${btnAnular}</td></tr>`; 
-            window.datosReporteCSV.push([v.fechaRegistro, v.usuario, v.sku, v.nombre, v.categoria, v.cantidad, sub.toFixed(2)]); 
+            hDetalle += `<tr class="border-b hover:bg-gray-50"><td class="p-3 text-[10px] text-gray-500"><strong class="text-gray-700 block">${tk.folio}</strong>${tk.fechaRegistro}</td><td class="p-3 font-bold text-xs">${tk.resumen}</td><td class="p-3 text-center font-bold">${pF}</td><td class="p-3 text-indigo-600 text-xs">${tk.usuario}</td><td class="p-3 text-right text-green-600 font-bold">$${tk.total.toFixed(2)}</td><td class="p-3 text-center">${btnAnular}</td></tr>`; 
         }); 
         if(tbDetalle) tbDetalle.innerHTML = hDetalle || "<tr><td colspan='6' class='p-8 text-center text-gray-500'>Sin ventas en este rango</td></tr>"; 
         
@@ -918,9 +998,103 @@ window.generarReporte = async () => {
         if(tbDetalle) tbDetalle.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error al procesar reportes</td></tr>`; 
     }
 };
-window.descargarCSV = () => { if(window.datosReporteCSV.length <= 1) return window.mostrarNotificacion("⚠️ Genera un reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; window.datosReporteCSV.forEach(function(rowArray) { let row = rowArray.map(item => `"${item}"`).join(","); csvContent += row + "\r\n"; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Reporte.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
-window.cargarKardex = async (tipo = 'entradas') => { window.kardexActual = tipo; document.getElementById('btn-kardex-entradas').className = tipo === 'entradas' ? 'px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; document.getElementById('btn-kardex-salidas').className = tipo === 'salidas' ? 'px-4 py-2 font-bold text-red-600 border-b-4 border-red-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; const z = document.getElementById('zonaSelect').value; const e = localStorage.getItem('empresaId'); const tb = document.getElementById('tablaKardexBody'); tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando...</td></tr>"; let movs = []; try { if (tipo === 'entradas') { const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); const iSn = await getDocs(qIngresos); iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); } else { const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); const vSn = await getDocs(qVentas); vSn.forEach(d => { movs.push({...d.data(), tipo: 'SALIDA'}); }); } movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); const movsRecientes = movs.slice(0, 100); let h = ""; movsRecientes.forEach(m => { let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; } if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; } const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad; h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`; }); tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>Sin movimientos.</td></tr>`; } catch (err) { tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error</td></tr>`; } };
 
+window.anularVenta = async (docId) => {
+    if(!confirm("⚠️ ¿Anular este ticket completo? Todos sus productos regresarán al stock.")) return;
+    const z = document.getElementById('zonaSelect').value;
+    const e = localStorage.getItem('empresaId');
+    
+    try {
+        const ventaRef = doc(db, `${e}_Historial_Ventas`, docId);
+        const ventaSnap = await getDoc(ventaRef);
+        if (!ventaSnap.exists()) return;
+
+        const data = ventaSnap.data();
+        const itemsADevolver = Array.isArray(data.items) ? data.items : [{ sku: data.sku, cantidad: data.cantidad }];
+
+        await deleteDoc(ventaRef);
+
+        for (const item of itemsADevolver) {
+            const invRef = doc(db, `${e}_Inventario_${z}`, item.sku);
+            const invSnap = await getDoc(invRef);
+            if(invSnap.exists()) {
+                const stockActualizado = invSnap.data().stock + parseFloat(item.cantidad);
+                await setDoc(invRef, { stock: stockActualizado }, { merge: true });
+                const objLocal = await window.localDB.inventario.get(item.sku);
+                if(objLocal) {
+                    objLocal.stock = stockActualizado;
+                    await window.localDB.inventario.put(objLocal);
+                }
+            }
+        }
+        
+        window.mostrarNotificacion("✅ Ticket anulado. Stock restaurado.");
+        window.generarReporte();
+        window.cargarInventarioGeneral();
+    } catch(err) {
+        console.error(err);
+        window.mostrarNotificacion("❌ Error al anular el ticket.");
+    }
+};
+
+window.descargarCSV = () => { if(window.datosReporteCSV.length <= 1) return window.mostrarNotificacion("⚠️ Genera un reporte primero."); let csvContent = "data:text/csv;charset=utf-8,\uFEFF"; window.datosReporteCSV.forEach(function(rowArray) { let row = rowArray.map(item => `"${item}"`).join(","); csvContent += row + "\r\n"; }); const link = document.createElement("a"); link.setAttribute("href", encodeURI(csvContent)); link.setAttribute("download", `Reporte.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
+window.cargarKardex = async (tipo = 'entradas') => { 
+    window.kardexActual = tipo; 
+    document.getElementById('btn-kardex-entradas').className = tipo === 'entradas' ? 'px-4 py-2 font-bold text-green-600 border-b-4 border-green-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; 
+    document.getElementById('btn-kardex-salidas').className = tipo === 'salidas' ? 'px-4 py-2 font-bold text-red-600 border-b-4 border-red-600 transition' : 'px-4 py-2 font-bold text-gray-400 hover:text-red-500 border-b-4 border-transparent transition'; 
+    
+    const z = document.getElementById('zonaSelect').value; 
+    const e = localStorage.getItem('empresaId'); 
+    const tb = document.getElementById('tablaKardexBody'); 
+    tb.innerHTML = "<tr><td colspan='6' class='p-8 text-center'>Consultando...</td></tr>"; 
+    
+    let movs = []; 
+    try { 
+        if (tipo === 'entradas') { 
+            const qIngresos = query(collection(db, `${e}_Historial_Ingresos`), where("zona", "==", z)); 
+            const iSn = await getDocs(qIngresos); 
+            iSn.forEach(d => { movs.push({...d.data(), tipo: d.data().tipoMovimiento || 'ENTRADA'}); }); 
+        } else { 
+            const qVentas = query(collection(db, `${e}_Historial_Ventas`), where("zona", "==", z)); 
+            const vSn = await getDocs(qVentas); 
+            vSn.forEach(d => { 
+                const v = d.data();
+                if (Array.isArray(v.items)) {
+                    v.items.forEach(item => {
+                        movs.push({
+                            sku: item.sku,
+                            nombre: `${item.nombre} (${v.folio || 'Ticket'})`,
+                            cantidad: item.cantidad,
+                            usuario: v.usuario,
+                            fechaRegistro: v.fechaRegistro,
+                            timestamp: v.timestamp,
+                            tipo: 'SALIDA'
+                        });
+                    });
+                } else {
+                    movs.push({...v, tipo: 'SALIDA'}); 
+                }
+            }); 
+        } 
+
+        movs.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)); 
+        const movsRecientes = movs.slice(0, 100); 
+        let h = ""; 
+
+        movsRecientes.forEach(m => { 
+            let bc = 'bg-gray-100 text-gray-700'; let ic = '⚙️'; 
+            if(m.tipo === 'ENTRADA') { bc = 'bg-green-100 text-green-700'; ic = '📦'; } 
+            if(m.tipo === 'SALIDA') { bc = 'bg-red-100 text-red-700'; ic = '🛍️'; } 
+            if(m.tipo === 'AJUSTE') { bc = 'bg-orange-100 text-orange-700'; ic = '✏️'; } 
+            if(m.tipo === 'ELIMINACIÓN') { bc = 'bg-red-800 text-white'; ic = '🗑️'; } 
+            const cV = m.cantidad % 1 !== 0 ? parseFloat(m.cantidad).toFixed(3) : m.cantidad; 
+            h += `<tr class="border-b"><td class="p-3 text-xs text-gray-500">${m.fechaRegistro}</td><td class="p-3"><span class="px-3 py-1 rounded text-xs font-bold ${bc}">${ic} ${m.tipo}</span></td><td class="p-3 font-mono text-xs">${m.sku}</td><td class="p-3 font-medium">${m.nombre}</td><td class="p-3 text-center font-bold">${cV}</td><td class="p-3 text-gray-600">${m.usuario}</td></tr>`; 
+        }); 
+        tb.innerHTML = h || `<tr><td colspan='6' class='text-center p-8'>Sin movimientos.</td></tr>`; 
+    } catch (err) { 
+        tb.innerHTML = `<tr><td colspan='6' class='text-red-500 text-center p-8'>Error</td></tr>`; 
+    } 
+};
 window.crearUsuarioSecundario = async () => { const u = document.getElementById('new_user').value.trim(); const em = document.getElementById('new_email').value.trim().toLowerCase(); const p = document.getElementById('new_pass').value.trim(); const r = document.getElementById('new_role').value; const empId = localStorage.getItem('empresaId'); const empNom = localStorage.getItem('empresaNombre') || empId; const zn = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!u || !p || !em) return window.mostrarNotificacion("⚠️ Llena todos los datos"); try { const cred = await createUserWithEmailAndPassword(secondaryAuth, em, p); const uid = cred.user.uid; await secondaryAuth.signOut(); await setDoc(doc(db, "SaaS_Directorio", u), { email: em, uid: uid }); await setDoc(doc(db, "SaaS_Usuarios", uid), { empresaId: empId, empresaNombre: empNom, rol: r, zonas: zn, usuario: u }); window.mostrarNotificacion(`✅ Creado con éxito.`); ['new_user', 'new_email', 'new_pass'].forEach(id => document.getElementById(id).value = ''); window.cargarUsuarios(); } catch(er) { window.mostrarNotificacion("❌ Error."); } };
 window.cargarUsuarios = async () => { 
     const e = localStorage.getItem('empresaId'); 
@@ -942,6 +1116,7 @@ window.cargarUsuarios = async () => {
     } 
 };
 window.agregarNuevaZona = async () => { const nZ = prompt("Nombre de la nueva zona:"); if(nZ) { const u = localStorage.getItem('currentUser'); const z = JSON.parse(localStorage.getItem('zonas') || "[]"); if(!z.includes(nZ)) { z.push(nZ); await setDoc(doc(db, "SaaS_Usuarios", u), { zonas: z }, { merge: true }); localStorage.setItem('zonas', JSON.stringify(z)); window.mostrarNotificacion("✅ Agregada."); setTimeout(() => { location.reload(); }, 1500); } else { window.mostrarNotificacion("⚠️ Ya existe."); } } };
+
 
 if(localStorage.getItem('currentUser')) { iniciarApp(); }
 
@@ -1003,40 +1178,5 @@ window.calcularCambio = () => {
         lblCambio.innerText = "$0.00";
         lblCambio.classList.remove('text-red-500');
         lblCambio.classList.add('text-blue-600');
-    }
-};
-window.anularVenta = async (docId, sku, cantidadDevuelta) => {
-    if(!confirm("⚠️ ¿Eliminar esta venta? Los productos regresarán al stock automáticamente.")) return;
-    
-    const z = document.getElementById('zonaSelect').value;
-    const e = localStorage.getItem('empresaId');
-    
-    try {
-        // 1. Destruir el registro de la venta en la nube
-        await deleteDoc(doc(db, `${e}_Historial_Ventas`, docId));
-        
-        // 2. Regresar los artículos al inventario en la nube
-        const invRef = doc(db, `${e}_Inventario_${z}`, sku);
-        const invSnap = await getDoc(invRef);
-        
-        if(invSnap.exists()) {
-            const stockActualizado = invSnap.data().stock + cantidadDevuelta;
-            await setDoc(invRef, { stock: stockActualizado }, { merge: true });
-            
-            // 3. Sincronizar tu disco duro ultrarrápido (Dexie.js)
-            const objLocal = await window.localDB.inventario.get(sku);
-            if(objLocal) {
-                objLocal.stock = stockActualizado;
-                await window.localDB.inventario.put(objLocal);
-            }
-        }
-        
-        window.mostrarNotificacion("✅ Venta anulada. Stock restaurado.");
-        window.generarReporte(); // Recalcula los totales en pantalla al instante
-        window.cargarInventarioGeneral(); // Actualiza el inventario en segundo plano
-        
-    } catch(err) {
-        console.error(err);
-        window.mostrarNotificacion("❌ Error al anular la venta.");
     }
 };
